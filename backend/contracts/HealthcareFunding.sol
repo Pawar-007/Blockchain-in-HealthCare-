@@ -1,27 +1,434 @@
 // SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.20;
+
+// /// @title HealthcareFundingOrchestrator (improved)
+// /// @notice Improved version of your funding orchestrator with clearer errors, safer refund/disbursement rules,
+// ///         corrected permission checks, and some gas/readability improvements.
+// contract HealthcareFundingOrchestrator {
+//     // -----------------------------
+//     // ERRORS (explicit, gas-friendly)
+//     // -----------------------------
+//     error Unauthorized();
+//     error NotHospital();
+//     error InvalidRequest();
+//     error AlreadyApproved();
+//     error NotApproved();
+//     error AlreadyCanceled();
+//     error AlreadyDisbursed();
+//     error NotVisible();
+//     error ZeroValue();
+//     error ZeroAddress();
+//     error OverPool();
+//     error NothingToRefund();
+//     error DeadlineTooSoon();
+//     error DonationsClosed();
+//     error RequestNotOpen();
+//     error RefundNotAllowedAfterDisbursement();
+
+//     // -----------------------------
+//     // ROLES
+//     // -----------------------------
+//     address public immutable admin;
+//     mapping(address => bool) public hospitals; // whitelist of hospital verifier accounts
+
+//     modifier onlyAdmin() {
+//         if (msg.sender != admin) revert Unauthorized();
+//         _;
+//     }
+//     modifier onlyHospital() {
+//         if (!hospitals[msg.sender]) revert NotHospital();
+//         _;
+//     }
+
+//     // -----------------------------
+//     // REENTRANCY
+//     // -----------------------------
+//     uint256 private _reentrancyLock = 1;
+//     modifier nonReentrant() {
+//         if (_reentrancyLock != 1) revert Unauthorized();
+//         _reentrancyLock = 2;
+//         _;
+//         _reentrancyLock = 1;
+//     }
+
+//     constructor() {
+//         admin = msg.sender;
+//     }
+
+//     // -----------------------------
+//     // MODEL
+//     // -----------------------------
+//     enum State {
+//         Pending,
+//         UnderReview,
+//         Approved,
+//         Canceled,
+//         Disbursed
+//     }
+
+//     struct Request {
+//         // actors & verification
+//         address patient;
+//         address payable hospitalWallet;
+//         address hospitalVerifier;
+//         // money
+//         uint256 goal;
+//         uint256 raised;
+//         uint256 disbursed;
+//         uint64 deadline;
+//         // state flags
+//         State state;
+//         bool adminCallDone;
+//         bool hospitalVerified;
+//         bool physicalVisitDone;
+//         // metadata & pointers
+//         string title;
+//         string description;
+//         string patientDataCID;
+//         string hospitalDataCID;
+//         string documentsBundleCID;
+//         address storageContract;
+//         uint256[] recordIds;
+//     }
+
+//     uint256 public requestCount;
+//     mapping(uint256 => Request) private requests;
+
+//     // donor ledger per request
+//     mapping(uint256 => mapping(address => uint256)) public contributions;
+//     mapping(uint256 => address[]) public donorsList;
+//     mapping(uint256 => mapping(address => bool)) private _seenDonor;
+
+//     // general pool
+//     uint256 public generalPool;
+
+//     // -----------------------------
+//     // EVENTS
+//     // -----------------------------
+//     event HospitalWhitelisted(address indexed hospital, bool allowed);
+
+//     event RequestCreated(uint256 indexed id, address indexed patient, address indexed hospitalWallet, uint256 goal, uint64 deadline);
+//     event RequestVerificationUpdated(uint256 indexed id, bool adminCallDone, bool hospitalVerified, bool physicalVisitDone, address hospitalVerifier);
+//     event RequestApproved(uint256 indexed id);
+//     event RequestCanceled(uint256 indexed id);
+//     event DonationReceived(uint256 indexed id, address indexed donor, uint256 amount, uint256 newRaised);
+//     event GeneralPoolDonation(address indexed donor, uint256 amount, uint256 newPoolBalance);
+//     event GeneralPoolAllocated(uint256 indexed id, uint256 amount, uint256 newRaised, uint256 newPoolBalance);
+//     event Disbursed(uint256 indexed id, address indexed hospitalWallet, uint256 amount);
+//     event RequestCompleted(uint256 indexed id, address indexed patient);
+//     event RefundIssued(uint256 indexed id, address indexed donor, uint256 amount);
+
+//     // -----------------------------
+//     // ADMIN / HOSPITAL OPERATIONS
+//     // -----------------------------
+//     function setHospital(address hospital, bool allowed) external onlyAdmin {
+//         if (hospital == address(0)) revert ZeroAddress();
+//         hospitals[hospital] = allowed;
+//         emit HospitalWhitelisted(hospital, allowed);
+//     }
+
+//     // -----------------------------
+//     // CREATE REQUEST
+//     // -----------------------------
+//     function createRequest(
+//         address payable _hospitalWallet,
+//         uint256 _goal,
+//         uint64 _deadline,
+//         string calldata _title,
+//         string calldata _description,
+//         string calldata _patientDataCID,
+//         string calldata _hospitalDataCID,
+//         string calldata _documentsBundleCID,
+//         address _storageContract,
+//         uint256[] calldata _recordIds
+//     ) external returns (uint256 id) {
+//         if (_hospitalWallet == address(0)) revert ZeroAddress();
+//         if (_goal == 0) revert ZeroValue();
+//         if (_deadline <= block.timestamp + 1 days) revert DeadlineTooSoon();
+
+//         id = ++requestCount;
+//         Request storage r = requests[id];
+
+//         r.patient = msg.sender;
+//         r.hospitalWallet = _hospitalWallet;
+//         r.goal = _goal;
+//         r.raised = 0;
+//         r.disbursed = 0;
+//         r.deadline = _deadline;
+//         r.state = State.Pending;
+
+//         r.title = _title;
+//         r.description = _description;
+//         r.patientDataCID = _patientDataCID;
+//         r.hospitalDataCID = _hospitalDataCID;
+//         r.documentsBundleCID = _documentsBundleCID;
+//         r.storageContract = _storageContract;
+
+//         if (_recordIds.length > 0) {
+//             r.recordIds = _recordIds;
+//         }
+
+//         emit RequestCreated(id, msg.sender, _hospitalWallet, _goal, _deadline);
+//     }
+
+//     // -----------------------------
+//     // VERIFICATION PIPELINE
+//     // -----------------------------
+//     function setAdminCallDone(uint256 _id, bool _done) external onlyAdmin {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
+//         r.adminCallDone = _done;
+//         _maybeMoveUnderReview(r);
+//         emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
+//     }
+
+//     function setHospitalVerified(uint256 _id, bool _done) external onlyHospital {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
+//         r.hospitalVerified = _done;
+//         r.hospitalVerifier = msg.sender;
+//         _maybeMoveUnderReview(r);
+//         emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
+//     }
+
+//     function setPhysicalVisit(uint256 _id, bool _done) external onlyAdmin {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
+//         r.physicalVisitDone = _done;
+//         _maybeMoveUnderReview(r);
+//         emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
+//     }
+
+//     function approve(uint256 _id) external onlyAdmin {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
+//         if (!(r.adminCallDone && r.hospitalVerified && r.physicalVisitDone)) revert NotApproved();
+//         if (r.state == State.Approved) revert AlreadyApproved();
+//         r.state = State.Approved;
+//         emit RequestApproved(_id);
+//     }
+
+//     /// Admin or patient can cancel
+//     function cancel(uint256 _id) external {
+//         Request storage r = _getRequest(_id);
+//         // admin or the patient can cancel
+//         if (msg.sender != admin && msg.sender != r.patient) revert Unauthorized();
+//         if (r.state == State.Canceled) revert AlreadyCanceled();
+//         if (r.state == State.Disbursed) revert AlreadyDisbursed();
+//         r.state = State.Canceled;
+//         emit RequestCanceled(_id);
+//     }
+
+//     function _maybeMoveUnderReview(Request storage r) internal {
+//         if (r.state == State.Pending) {
+//             if (r.adminCallDone || r.hospitalVerified || r.physicalVisitDone) {
+//                 r.state = State.UnderReview;
+//             }
+//         }
+//     }
+
+//     // -----------------------------
+//     // DONATIONS
+//     // -----------------------------
+//     /// Donate to a specific approved request
+//     function donateToRequest(uint256 _id) external payable nonReentrant {
+//         Request storage r = _getRequest(_id);
+//         if (r.state != State.Approved) revert NotVisible();
+//         if (block.timestamp > r.deadline) revert DonationsClosed();
+//         if (msg.value == 0) revert ZeroValue();
+
+//         r.raised += msg.value;
+
+//         if (!_seenDonor[_id][msg.sender]) {
+//             _seenDonor[_id][msg.sender] = true;
+//             donorsList[_id].push(msg.sender);
+//         }
+//         contributions[_id][msg.sender] += msg.value;
+
+//         emit DonationReceived(_id, msg.sender, msg.value, r.raised);
+//     }
+
+//     /// Donate to general pool
+//     function donateToPool() external payable nonReentrant {
+//         if (msg.value == 0) revert ZeroValue();
+//         generalPool += msg.value;
+//         emit GeneralPoolDonation(msg.sender, msg.value, generalPool);
+//     }
+
+//     /// Admin allocates pool funds to a request (escrowed in contract)
+//     function allocateFromPool(uint256 _id, uint256 _amount) external onlyAdmin {
+//         Request storage r = _getRequest(_id);
+//         if (r.state != State.Approved) revert NotVisible();
+//         if (_amount == 0 || _amount > generalPool) revert OverPool();
+//         r.raised += _amount;
+//         generalPool -= _amount;
+//         emit GeneralPoolAllocated(_id, _amount, r.raised, generalPool);
+//     }
+
+//     // -----------------------------
+//     // DISBURSEMENT & REFUNDS
+//     // -----------------------------
+//     /// Admin disburses to hospital. Cannot disburse more than available.
+//     function disburseToHospital(uint256 _id, uint256 _amount) external onlyAdmin nonReentrant {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Canceled) revert AlreadyCanceled();
+//         if (r.state == State.Disbursed) revert AlreadyDisbursed();
+//         if (r.state != State.Approved) revert NotVisible();
+
+//         uint256 available = r.raised - r.disbursed;
+//         if (_amount == 0 || _amount > available) revert ZeroValue();
+
+//         r.disbursed += _amount;
+
+//         // transfer
+//         (bool ok, ) = r.hospitalWallet.call{value: _amount}("");
+//         require(ok, "DISBURSE_FAIL");
+
+//         emit Disbursed(_id, r.hospitalWallet, _amount);
+
+//         // if fully met goal or fully disbursed to match business rules mark Disbursed
+//         if (r.disbursed >= r.goal) {
+//             r.state = State.Disbursed;
+//             emit RequestCompleted(_id, r.patient);
+//         }
+//     }
+
+//     /// Donor refund: only allowed if request canceled OR deadline passed AND no disbursement happened.
+//     /// NOTE: If any disbursement already happened, refunds are NOT allowed here to avoid pro-rata complexity.
+//     function refund(uint256 _id) external nonReentrant {
+//         Request storage r = _getRequest(_id);
+//         if (r.state == State.Disbursed) revert AlreadyDisbursed();
+
+//         bool eligible = (r.state == State.Canceled) || (block.timestamp > r.deadline);
+//         if (!eligible) revert RequestNotOpen();
+
+//         // If any disbursement already happened, pro-rata refund is required (not supported here)
+//         if (r.disbursed > 0) revert RefundNotAllowedAfterDisbursement();
+
+//         uint256 amt = contributions[_id][msg.sender];
+//         if (amt == 0) revert NothingToRefund();
+
+//         // zero contribution then refund
+//         contributions[_id][msg.sender] = 0;
+//         // keep r.raised consistent
+//         r.raised -= amt;
+
+//         (bool ok, ) = payable(msg.sender).call{value: amt}("");
+//         require(ok, "REFUND_FAIL");
+
+//         emit RefundIssued(_id, msg.sender, amt);
+//     }
+
+//     // -----------------------------
+//     // VIEWS
+//     // -----------------------------
+//     function getRequest(uint256 _id)
+//         external
+//         view
+//         returns (
+//             address patient,
+//             address hospitalWallet,
+//             address hospitalVerifier,
+//             uint256 goal,
+//             uint256 raised,
+//             uint256 disbursed,
+//             uint64 deadline,
+//             State state,
+//             bool adminCallDone,
+//             bool hospitalVerified,
+//             bool physicalVisitDone,
+//             string memory title,
+//             string memory description,
+//             string memory patientDataCID,
+//             string memory hospitalDataCID,
+//             string memory documentsBundleCID,
+//             address storageContract,
+//             uint256[] memory recordIds
+//         )
+//     {
+//         Request storage r = _getRequest(_id);
+//         return (
+//             r.patient,
+//             r.hospitalWallet,
+//             r.hospitalVerifier,
+//             r.goal,
+//             r.raised,
+//             r.disbursed,
+//             r.deadline,
+//             r.state,
+//             r.adminCallDone,
+//             r.hospitalVerified,
+//             r.physicalVisitDone,
+//             r.title,
+//             r.description,
+//             r.patientDataCID,
+//             r.hospitalDataCID,
+//             r.documentsBundleCID,
+//             r.storageContract,
+//             r.recordIds
+//         );
+//     }
+
+//     function getDonors(uint256 _id) external view returns (address[] memory donors, uint256[] memory amounts) {
+//         donors = donorsList[_id];
+//         amounts = new uint256[](donors.length);
+//         for (uint256 i = 0; i < donors.length; ++i) {
+//             amounts[i] = contributions[_id][donors[i]];
+//         }
+//     }
+
+//     // lightweight pagination for basic catalog
+//     function getRequestsBasic(uint256 startId, uint256 count)
+//         external
+//         view
+//         returns (uint256[] memory ids, State[] memory states, uint256[] memory goals, uint256[] memory raisedAmounts)
+//     {
+//         if (count == 0 || startId == 0 || startId > requestCount) {
+//             return (new uint256, new State, new uint256, new uint256);
+//         }
+
+//         uint256 end = startId + count - 1;
+//         if (end > requestCount) end = requestCount;
+//         uint256 len = end - startId + 1;
+
+//         ids = new uint256[](len);
+//         states = new State[](len);
+//         goals = new uint256[](len);
+//         raisedAmounts = new uint256[](len);
+
+//         for (uint256 i = 0; i < len; ++i) {
+//             uint256 id = startId + i;
+//             Request storage r = requests[id];
+//             ids[i] = id;
+//             states[i] = r.state;
+//             goals[i] = r.goal;
+//             raisedAmounts[i] = r.raised;
+//         }
+//     }
+
+//     // -----------------------------
+//     // INTERNALS
+//     // -----------------------------
+//     function _getRequest(uint256 _id) internal view returns (Request storage r) {
+//         r = requests[_id];
+//         if (r.patient == address(0)) revert InvalidRequest();
+//     }
+
+//     // accept tips
+//     receive() external payable {}
+//     fallback() external payable {}
+// }
+
 pragma solidity ^0.8.20;
 
-/**
- * @title HealthcareFundingOrchestrator
- * @notice Orchestrates healthcare funding with a verification pipeline.
- *         - Patients create requests with form data + pointers to documents.
- *         - Admin & whitelisted hospitals verify; donors never see documents.
- *         - Once approved, donations open. Funds are escrowed here.
- *         - Admin disburses directly to hospital wallet.
- *         - Tracks donor history. Supports a general donation pool for admin allocation.
- *
- * SECURITY NOTES:
- * - Do NOT put PHI on-chain. Use IPFS (encrypted) or your MedicalRecordStorage and store only pointers/cids.
- * - Document access (admin/hospital only) is maintained in your storage contract. This contract emits events
- *   so your dApp can instruct patients to grant/revoke access there.
- */
+/// @title HealthcareFundingOrchestrator (improved - multi-admin)
+/// @notice Multiple admins can verify/approve/disburse. Owner manages admin list.
 contract HealthcareFundingOrchestrator {
     // -----------------------------
-    // Errors
+    // ERRORS
     // -----------------------------
-    error NotAdmin();
+    error Unauthorized();
     error NotHospital();
-    error NotPatient();
     error InvalidRequest();
     error AlreadyApproved();
     error NotApproved();
@@ -30,20 +437,27 @@ contract HealthcareFundingOrchestrator {
     error NotVisible();
     error ZeroValue();
     error ZeroAddress();
-    error OverGoal();
+    error OverPool();
     error NothingToRefund();
     error DeadlineTooSoon();
     error DonationsClosed();
     error RequestNotOpen();
+    error RefundNotAllowedAfterDisbursement();
 
     // -----------------------------
-    // Roles
+    // ROLES
     // -----------------------------
-    address public immutable admin;
-    mapping(address => bool) public hospitals; // allow-list of hospital verifier accounts
+    address public owner;
+    mapping(address => bool) public admins;
+    mapping(address => bool) public hospitals;
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
 
     modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
+        if (!admins[msg.sender]) revert Unauthorized();
         _;
     }
 
@@ -52,113 +466,95 @@ contract HealthcareFundingOrchestrator {
         _;
     }
 
-    uint256 private _lock = 1;
+    // -----------------------------
+    // REENTRANCY
+    // -----------------------------
+    uint256 private _reentrancyLock = 1;
     modifier nonReentrant() {
-        require(_lock == 1, "REENTRANCY");
-        _lock = 2;
+        if (_reentrancyLock != 1) revert Unauthorized();
+        _reentrancyLock = 2;
         _;
-        _lock = 1;
+        _reentrancyLock = 1;
     }
 
     constructor() {
-        admin = msg.sender;
+        owner = msg.sender;
+        admins[msg.sender] = true;
     }
 
     // -----------------------------
-    // Request model
+    // MODEL
     // -----------------------------
     enum State {
-        Pending, // created by patient, awaiting verification steps
-        UnderReview, // admin/hospital are working on checks
-        Approved, // fully verified -> visible to donors
-        Canceled, // canceled (by admin or patient) -> donors can refund
-        Disbursed // funds sent to hospital
+        Pending,
+        UnderReview,
+        Approved,
+        Canceled,
+        Disbursed
     }
 
     struct Request {
-        // Actors
-        address patient; // creator
-        address payable hospitalWallet; // where funds are paid upon disbursement
-        address hospitalVerifier; // hospital account that verified
-        // Money
-        uint256 goal; // target in wei
-        uint256 raised; // sum of donations + allocations
-        uint256 disbursed; // how much was sent to hospital
-        uint64 deadline; // donations close; after this refunds allowed if not disbursed
-        // Visibility & state
-        State state; // lifecycle
-        bool adminCallDone; // admin phone verification flag
-        bool hospitalVerified; // verified by hospital staff
-        bool physicalVisitDone; // physical visit confirmation
-        // Metadata (UI only; keep short) + pointers
-        string title; // short title
-        string description; // summary for donors (no private data)
-        string patientDataCID; // IPFS JSON with patient form (encrypted)
-        string hospitalDataCID; // IPFS JSON with hospital form/letter (encrypted)
-        string documentsBundleCID; // IPFS folder/CAR with documents (encrypted)
-        address storageContract; // optional: address of your MedicalRecordStorage
-        uint256[] recordIds; // optional: indices in MedicalRecordStorage
+        address patient;
+        address payable hospitalWallet;
+        address hospitalVerifier;
+        uint256 goal;
+        uint256 raised;
+        uint256 disbursed;
+        uint64 deadline;
+        State state;
+        bool adminCallDone;
+        bool hospitalVerified;
+        bool physicalVisitDone;
+        string title;
+        string description;
+        string patientDataCID;
+        string hospitalDataCID;
+        string documentsBundleCID;
+        address storageContract;
+        uint256[] recordIds;
+        address verifiedBy;
+        address fundedBy;
     }
 
     uint256 public requestCount;
     mapping(uint256 => Request) private requests;
 
-    // Per-request donor ledger
     mapping(uint256 => mapping(address => uint256)) public contributions;
-    mapping(uint256 => address[]) public donorsList; // small overhead, OK for moderate scale
-    mapping(uint256 => mapping(address => bool)) private _seenDonor; // to avoid duplicate in donorsList
+    mapping(uint256 => address[]) public donorsList;
+    mapping(uint256 => mapping(address => bool)) private _seenDonor;
 
-    // General donation pool (admin allocates later)
     uint256 public generalPool;
 
     // -----------------------------
-    // Events
+    // EVENTS
     // -----------------------------
-    event HospitalWhitelisted(address hospital, bool allowed);
-
-    event RequestCreated(
-        uint256 indexed id,
-        address indexed patient,
-        address indexed hospitalWallet,
-        uint256 goal,
-        uint64 deadline
-    );
-    event RequestVerificationUpdated(
-        uint256 indexed id,
-        bool adminCallDone,
-        bool hospitalVerified,
-        bool physicalVisitDone,
-        address hospitalVerifier
-    );
-    event RequestApproved(uint256 indexed id);
+    event AdminUpdated(address indexed admin, bool allowed);
+    event HospitalWhitelisted(address indexed hospital, bool allowed);
+    event RequestCreated(uint256 indexed id, address indexed patient, address indexed hospitalWallet, uint256 goal, uint64 deadline);
+    event RequestVerificationUpdated(uint256 indexed id, bool adminCallDone, bool hospitalVerified, bool physicalVisitDone, address hospitalVerifier);
+    event RequestApproved(uint256 indexed id, address indexed admin);
     event RequestCanceled(uint256 indexed id);
-    event DonationReceived(
-        uint256 indexed id,
-        address indexed donor,
-        uint256 amount,
-        uint256 newRaised
-    );
-    event GeneralPoolDonation(
-        address indexed donor,
-        uint256 amount,
-        uint256 newPoolBalance
-    );
-    event GeneralPoolAllocated(
-        uint256 indexed id,
-        uint256 amount,
-        uint256 newRaised,
-        uint256 newPoolBalance
-    );
-    event Disbursed(
-        uint256 indexed id,
-        address indexed hospitalWallet,
-        uint256 amount
-    );
-    event RequestCompleted(uint256 indexed id, address indexed patient); // dApp should prompt patient to revoke doc access
+    event DonationReceived(uint256 indexed id, address indexed donor, uint256 amount, uint256 newRaised);
+    event GeneralPoolDonation(address indexed donor, uint256 amount, uint256 newPoolBalance);
+    event GeneralPoolAllocated(uint256 indexed id, uint256 amount, uint256 newRaised, uint256 newPoolBalance);
+    event Disbursed(uint256 indexed id, address indexed hospitalWallet, uint256 amount, address indexed admin);
+    event RequestCompleted(uint256 indexed id, address indexed patient);
+    event RefundIssued(uint256 indexed id, address indexed donor, uint256 amount);
 
     // -----------------------------
-    // Admin ops
+    // OWNER / ADMIN MANAGEMENT
     // -----------------------------
+    function addAdmin(address _admin) external onlyOwner {
+        if (_admin == address(0)) revert ZeroAddress();
+        admins[_admin] = true;
+        emit AdminUpdated(_admin, true);
+    }
+
+    function removeAdmin(address _admin) external onlyOwner {
+        admins[_admin] = false;
+        emit AdminUpdated(_admin, false);
+    }
+
     function setHospital(address hospital, bool allowed) external onlyAdmin {
         if (hospital == address(0)) revert ZeroAddress();
         hospitals[hospital] = allowed;
@@ -166,30 +562,54 @@ contract HealthcareFundingOrchestrator {
     }
 
     // -----------------------------
-    // Create requests
+    // CREATE REQUEST (split init)
     // -----------------------------
     function createRequest(
-        address payable _hospitalWallet,
-        uint256 _goal,
-        uint64 _deadline,
-        // public, non-sensitive UI text
-        string calldata _title,
-        string calldata _description,
-        // encrypted IPFS pointers (admin/hospital only off-chain)
-        string calldata _patientDataCID,
-        string calldata _hospitalDataCID,
-        string calldata _documentsBundleCID,
-        // optional linkage to MedicalRecordStorage
-        address _storageContract,
-        uint256[] calldata _recordIds
-    ) external returns (uint256 id) {
+    address payable _hospitalWallet,
+    uint256 _goal,
+    uint64 _deadline,
+    string calldata _title,
+    string calldata _description,
+    string calldata _patientDataCID,
+    string calldata _hospitalDataCID,
+    string calldata _documentsBundleCID,
+    address _storageContract,
+    uint256[] calldata _recordIds
+) external returns (uint256 id) {
+    // Validate inputs first (no struct access yet)
+    if (_hospitalWallet == address(0)) revert ZeroAddress();
+    if (_goal == 0) revert ZeroValue();
+    if (_deadline <= block.timestamp + 1 days) revert DeadlineTooSoon();
+
+    id = ++requestCount;
+    Request storage r = requests[id];
+
+    // Initialize core fields
+    r.patient = msg.sender;
+    r.hospitalWallet = _hospitalWallet;
+    r.goal = _goal;
+    r.deadline = _deadline;
+    r.state = State.Pending;
+
+    // Initialize metadata (avoid passing all params again)
+    r.title = _title;
+    r.description = _description;
+    r.patientDataCID = _patientDataCID;
+    r.hospitalDataCID = _hospitalDataCID;
+    r.documentsBundleCID = _documentsBundleCID;
+    r.storageContract = _storageContract;
+    if (_recordIds.length > 0) r.recordIds = _recordIds;
+
+    emit RequestCreated(id, msg.sender, _hospitalWallet, _goal, _deadline);
+}
+
+    function _validateRequestInputs(address _hospitalWallet, uint256 _goal, uint64 _deadline) internal view {
         if (_hospitalWallet == address(0)) revert ZeroAddress();
         if (_goal == 0) revert ZeroValue();
-        // Require at least 24h to avoid instant-close raising/refund games (tune as needed)
         if (_deadline <= block.timestamp + 1 days) revert DeadlineTooSoon();
+    }
 
-        id = ++requestCount;
-
+    function _initRequestCore(uint256 id, address payable _hospitalWallet, uint256 _goal, uint64 _deadline) internal {
         Request storage r = requests[id];
         r.patient = msg.sender;
         r.hospitalWallet = _hospitalWallet;
@@ -198,93 +618,70 @@ contract HealthcareFundingOrchestrator {
         r.disbursed = 0;
         r.deadline = _deadline;
         r.state = State.Pending;
+    }
 
+    function _initRequestMetadata(
+        uint256 id,
+        string calldata _title,
+        string calldata _description,
+        string calldata _patientDataCID,
+        string calldata _hospitalDataCID,
+        string calldata _documentsBundleCID,
+        address _storageContract,
+        uint256[] calldata _recordIds
+    ) internal {
+        Request storage r = requests[id];
         r.title = _title;
         r.description = _description;
-
         r.patientDataCID = _patientDataCID;
         r.hospitalDataCID = _hospitalDataCID;
         r.documentsBundleCID = _documentsBundleCID;
-
         r.storageContract = _storageContract;
-        if (_recordIds.length > 0) {
-            r.recordIds = _recordIds;
-        }
-
-        emit RequestCreated(id, msg.sender, _hospitalWallet, _goal, _deadline);
+        if (_recordIds.length > 0) r.recordIds = _recordIds;
+        emit RequestCreated(id, msg.sender, r.hospitalWallet, r.goal, r.deadline);
     }
 
     // -----------------------------
-    // Verification pipeline
+    // VERIFICATION PIPELINE (unchanged)
     // -----------------------------
-    /// Admin marks that they called and spoke with the patient
     function setAdminCallDone(uint256 _id, bool _done) external onlyAdmin {
         Request storage r = _getRequest(_id);
-        if (r.state == State.Canceled || r.state == State.Disbursed)
-            revert RequestNotOpen();
+        if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
         r.adminCallDone = _done;
         _maybeMoveUnderReview(r);
-        emit RequestVerificationUpdated(
-            _id,
-            r.adminCallDone,
-            r.hospitalVerified,
-            r.physicalVisitDone,
-            r.hospitalVerifier
-        );
+        emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
     }
 
-    /// Hospital staff verifies the patient and case (whitelisted hospital only)
-    function setHospitalVerified(
-        uint256 _id,
-        bool _done
-    ) external onlyHospital {
+    function setHospitalVerified(uint256 _id, bool _done) external onlyHospital {
         Request storage r = _getRequest(_id);
-        if (r.state == State.Canceled || r.state == State.Disbursed)
-            revert RequestNotOpen();
+        if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
         r.hospitalVerified = _done;
         r.hospitalVerifier = msg.sender;
         _maybeMoveUnderReview(r);
-        emit RequestVerificationUpdated(
-            _id,
-            r.adminCallDone,
-            r.hospitalVerified,
-            r.physicalVisitDone,
-            r.hospitalVerifier
-        );
+        emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
     }
 
-    /// Physical visit flag (admin marks)
     function setPhysicalVisit(uint256 _id, bool _done) external onlyAdmin {
         Request storage r = _getRequest(_id);
-        if (r.state == State.Canceled || r.state == State.Disbursed)
-            revert RequestNotOpen();
+        if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
         r.physicalVisitDone = _done;
         _maybeMoveUnderReview(r);
-        emit RequestVerificationUpdated(
-            _id,
-            r.adminCallDone,
-            r.hospitalVerified,
-            r.physicalVisitDone,
-            r.hospitalVerifier
-        );
+        emit RequestVerificationUpdated(_id, r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
     }
 
-    /// When all checks pass, admin approves → visible to donors
     function approve(uint256 _id) external onlyAdmin {
         Request storage r = _getRequest(_id);
-        if (r.state == State.Canceled || r.state == State.Disbursed)
-            revert RequestNotOpen();
-        if (!(r.adminCallDone && r.hospitalVerified && r.physicalVisitDone))
-            revert NotApproved();
+        if (r.state == State.Canceled || r.state == State.Disbursed) revert RequestNotOpen();
+        if (!(r.adminCallDone && r.hospitalVerified && r.physicalVisitDone)) revert NotApproved();
         if (r.state == State.Approved) revert AlreadyApproved();
         r.state = State.Approved;
-        emit RequestApproved(_id);
+        r.verifiedBy = msg.sender;
+        emit RequestApproved(_id, msg.sender);
     }
 
-    /// Admin or patient can cancel (donors can refund)
     function cancel(uint256 _id) external {
         Request storage r = _getRequest(_id);
-        if (msg.sender != admin && msg.sender != r.patient) revert NotAdmin();
+        if (!admins[msg.sender] && msg.sender != r.patient) revert Unauthorized();
         if (r.state == State.Canceled) revert AlreadyCanceled();
         if (r.state == State.Disbursed) revert AlreadyDisbursed();
         r.state = State.Canceled;
@@ -292,231 +689,139 @@ contract HealthcareFundingOrchestrator {
     }
 
     function _maybeMoveUnderReview(Request storage r) internal {
-        if (r.state == State.Pending) {
-            if (r.adminCallDone || r.hospitalVerified || r.physicalVisitDone) {
-                r.state = State.UnderReview;
-            }
+        if (r.state == State.Pending && (r.adminCallDone || r.hospitalVerified || r.physicalVisitDone)) {
+            r.state = State.UnderReview;
         }
     }
 
     // -----------------------------
-    // Donations
+    // DONATIONS & DISBURSEMENT (unchanged)
     // -----------------------------
     function donateToRequest(uint256 _id) external payable nonReentrant {
         Request storage r = _getRequest(_id);
-        if (r.state != State.Approved) revert NotVisible(); // only after full verification
+        if (r.state != State.Approved) revert NotVisible();
         if (block.timestamp > r.deadline) revert DonationsClosed();
         if (msg.value == 0) revert ZeroValue();
-
-        // Accept over-goal donations (common in charity). If you want hard cap, uncomment:
-        // if (r.raised + msg.value > r.goal) revert OverGoal();
-
         r.raised += msg.value;
-
         if (!_seenDonor[_id][msg.sender]) {
             _seenDonor[_id][msg.sender] = true;
             donorsList[_id].push(msg.sender);
         }
         contributions[_id][msg.sender] += msg.value;
-
         emit DonationReceived(_id, msg.sender, msg.value, r.raised);
     }
 
-    /// Donate to general pool (admin decides later where to allocate)
     function donateToPool() external payable nonReentrant {
         if (msg.value == 0) revert ZeroValue();
         generalPool += msg.value;
         emit GeneralPoolDonation(msg.sender, msg.value, generalPool);
     }
 
-    /// Admin moves pooled funds into a specific request (still escrowed until disbursement)
     function allocateFromPool(uint256 _id, uint256 _amount) external onlyAdmin {
         Request storage r = _getRequest(_id);
         if (r.state != State.Approved) revert NotVisible();
-        if (_amount == 0 || _amount > generalPool) revert ZeroValue();
+        if (_amount == 0 || _amount > generalPool) revert OverPool();
         r.raised += _amount;
         generalPool -= _amount;
         emit GeneralPoolAllocated(_id, _amount, r.raised, generalPool);
     }
 
-    // -----------------------------
-    // Disbursement & Refunds
-    // -----------------------------
-    /// Admin sends funds directly to hospital wallet. Can be partial or full, but cannot exceed raised - disbursed.
-    function disburseToHospital(
-        uint256 _id,
-        uint256 _amount
-    ) external onlyAdmin nonReentrant {
+    function disburseToHospital(uint256 _id, uint256 _amount) external onlyAdmin nonReentrant {
         Request storage r = _getRequest(_id);
         if (r.state == State.Canceled) revert AlreadyCanceled();
         if (r.state == State.Disbursed) revert AlreadyDisbursed();
         if (r.state != State.Approved) revert NotVisible();
-
         uint256 available = r.raised - r.disbursed;
         if (_amount == 0 || _amount > available) revert ZeroValue();
-
         r.disbursed += _amount;
-
+        r.fundedBy = msg.sender;
         (bool ok, ) = r.hospitalWallet.call{value: _amount}("");
         require(ok, "DISBURSE_FAIL");
-
-        emit Disbursed(_id, r.hospitalWallet, _amount);
-
-        // If fully disbursed (>= goal), mark completed and notify UI to revoke doc access.
+        emit Disbursed(_id, r.hospitalWallet, _amount, msg.sender);
         if (r.disbursed >= r.goal) {
             r.state = State.Disbursed;
             emit RequestCompleted(_id, r.patient);
         }
     }
 
-    /// Donor can refund ONLY if request was canceled or expired (deadline passed) and not disbursed.
     function refund(uint256 _id) external nonReentrant {
         Request storage r = _getRequest(_id);
         if (r.state == State.Disbursed) revert AlreadyDisbursed();
-        bool eligible = (r.state == State.Canceled) ||
-            (block.timestamp > r.deadline);
+        bool eligible = r.state == State.Canceled || block.timestamp > r.deadline;
         if (!eligible) revert RequestNotOpen();
-
+        if (r.disbursed > 0) revert RefundNotAllowedAfterDisbursement();
         uint256 amt = contributions[_id][msg.sender];
         if (amt == 0) revert NothingToRefund();
-
         contributions[_id][msg.sender] = 0;
-
-        // Reduce raised to keep accounting consistent only if not yet disbursed any portion.
-        // If partial disbursement was allowed before deadline, we would need pro-rata logic.
-        // Here we only allow disburse while Approved and before deadline; refunds after deadline/cancel,
-        // so raised can shrink safely as nothing is disbursed in that branch.
         r.raised -= amt;
-
         (bool ok, ) = payable(msg.sender).call{value: amt}("");
         require(ok, "REFUND_FAIL");
+        emit RefundIssued(_id, msg.sender, amt);
     }
 
     // -----------------------------
-    // Views
+    // VIEWS
     // -----------------------------
-    function getRequest(
-        uint256 _id
-    )
-        external
-        view
-        returns (
-            // actors
-            address patient,
-            address hospitalWallet,
-            address hospitalVerifier,
-            // money
-            uint256 goal,
-            uint256 raised,
-            uint256 disbursed,
-            uint64 deadline,
-            // verification/state
-            State state,
-            bool adminCallDone,
-            bool hospitalVerified,
-            bool physicalVisitDone,
-            // metadata & pointers
-            string memory title,
-            string memory description,
-            string memory patientDataCID,
-            string memory hospitalDataCID,
-            string memory documentsBundleCID,
-            address storageContract,
-            uint256[] memory recordIds
-        )
+    function getRequestBasic(uint256 _id)
+        external view
+        returns (address patient, address hospitalWallet, uint256 goal, uint256 raised, State state, uint64 deadline)
     {
         Request storage r = _getRequest(_id);
-        return (
-            r.patient,
-            r.hospitalWallet,
-            r.hospitalVerifier,
-            r.goal,
-            r.raised,
-            r.disbursed,
-            r.deadline,
-            r.state,
-            r.adminCallDone,
-            r.hospitalVerified,
-            r.physicalVisitDone,
-            r.title,
-            r.description,
-            r.patientDataCID,
-            r.hospitalDataCID,
-            r.documentsBundleCID,
-            r.storageContract,
-            r.recordIds
-        );
+        return (r.patient, r.hospitalWallet, r.goal, r.raised, r.state, r.deadline);
     }
 
-    function getDonors(
-        uint256 _id
-    )
-        external
-        view
-        returns (address[] memory donors, uint256[] memory amounts)
+    function getRequestVerificationDetails(uint256 _id)
+        external view
+        returns (bool adminCallDone, bool hospitalVerified, bool physicalVisitDone, address hospitalVerifier)
     {
         Request storage r = _getRequest(_id);
+        return (r.adminCallDone, r.hospitalVerified, r.physicalVisitDone, r.hospitalVerifier);
+    }
+
+    function getRequestMetadata(uint256 _id)
+        external view
+        returns (string memory title, string memory description, string memory patientDataCID, string memory hospitalDataCID)
+    {
+        Request storage r = _getRequest(_id);
+        return (r.title, r.description, r.patientDataCID, r.hospitalDataCID);
+    }
+
+    function getDonors(uint256 _id) external view returns (address[] memory donors, uint256[] memory amounts) {
         donors = donorsList[_id];
         amounts = new uint256[](donors.length);
-        for (uint256 i = 0; i < donors.length; i++) {
+        for (uint256 i = 0; i < donors.length; ++i) {
             amounts[i] = contributions[_id][donors[i]];
         }
     }
 
-    // Pagination helper to list requests (e.g., visible ones for the website)
-    function getRequestsBasic(
-    uint256 startId,
-    uint256 count
-)
-    external
-    view
-    returns (
-        uint256[] memory ids,
-        State[] memory states,
-        uint256[] memory goals,
-        uint256[] memory raisedAmounts
-    )
-{
-    if (count == 0 || startId == 0 || startId > requestCount) {
-    return (
-        new uint256 ,
-        new State ,
-        new uint256 ,
-        new uint256 
-    );
-}
-
-    uint256 end = startId + count - 1;
-    if (end > requestCount) end = requestCount;
-
-    uint256 len = end - startId + 1;
-    ids = new uint256[](len);
-    states = new State[](len);
-    goals = new uint256[](len);
-    raisedAmounts = new uint256[](len);
-
-    for (uint256 i = 0; i < len; i++) {
-        uint256 id = startId + i;
-        Request storage r = requests[id];
-        ids[i] = id;
-        states[i] = r.state;
-        goals[i] = r.goal;
-        raisedAmounts[i] = r.raised;
+    function getRequestsBasic(uint256 startId, uint256 count)
+        external view
+        returns (uint256[] memory ids, State[] memory states, uint256[] memory goals, uint256[] memory raisedAmounts)
+    {
+        if (count == 0 || startId == 0 || startId > requestCount) return (new uint256[](0), new State[](0), new uint256[](0), new uint256[](0));
+        uint256 end = startId + count - 1;
+        if (end > requestCount) end = requestCount;
+        uint256 len = end - startId + 1;
+        ids = new uint256[](len);
+        states = new State[](len);
+        goals = new uint256[](len);
+        raisedAmounts = new uint256[](len);
+        for (uint256 i = 0; i < len; ++i) {
+            uint256 id = startId + i;
+            Request storage r = requests[id];
+            ids[i] = id;
+            states[i] = r.state;
+            goals[i] = r.goal;
+            raisedAmounts[i] = r.raised;
+        }
     }
-}
 
-    // -----------------------------
-    // Internal
-    // -----------------------------
-    function _getRequest(
-        uint256 _id
-    ) internal view returns (Request storage r) {
+    function _getRequest(uint256 _id) internal view returns (Request storage r) {
         r = requests[_id];
         if (r.patient == address(0)) revert InvalidRequest();
     }
 
-    // Accept tips to the contract (not pooled)
+    // accept tips
     receive() external payable {}
-
     fallback() external payable {}
 }

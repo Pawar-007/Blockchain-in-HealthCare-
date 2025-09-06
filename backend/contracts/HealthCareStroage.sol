@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/**
- * @title MedicalRecordStorage
- * @notice Stores immutable patient identifiers and grants access to their records.
- * All sensitive personal and medical data is kept off-chain and referenced by IPFS hashes.
- */
 contract MedicalRecordStorage {
     // -----------------------------
     // ERRORS
@@ -21,41 +16,40 @@ contract MedicalRecordStorage {
     // STRUCTS
     // -----------------------------
 
-    // The Patient struct is now simplified to only store essential, non-sensitive data on-chain.
     struct Patient {
         bool registered;
         address guardian;
+        uint256 recordCount;                 // total records uploaded
+        uint256[] fundingRecordIds;          // IDs of records marked for funding
+        mapping(uint256 => bool) isFundingRecord; // fast lookup
     }
 
     struct HealthRecord {
+        string title;           
         string ipfsHash;        // Encrypted file stored on IPFS
-        string metadata;        // JSON metadata (e.g., date, doctor, record type)
+        string metadata;        // JSON metadata
         uint256 timestamp;
         bool sharedForFunding;
-    }
-
-    struct AccessRequest {
-        bool exists;
-        bool approved;
     }
 
     // -----------------------------
     // STATE VARIABLES
     // -----------------------------
 
-    mapping(address => Patient) public patients;
-    mapping(address => HealthRecord[]) private patientRecords;
-    mapping(address => mapping(address => AccessRequest)) public access;
+    mapping(address => Patient) private patients;
+    mapping(address => mapping(uint256 => HealthRecord)) private patientRecords; // patient → recordId → record
+    mapping(address => mapping(address => bool)) public access; // patient → user → access granted
 
     // -----------------------------
     // EVENTS
     // -----------------------------
 
-    event PatientRegistered(address indexed patient, address guardian);
-    event RecordUploaded(address indexed patient, string ipfsHash, string metadata, uint256 timestamp);
+    event PatientRegistered(address indexed patient);
+    event GuardianUpdated(address indexed patient, address indexed newGuardian);
+    event RecordUploaded(address indexed patient, uint256 indexed recordId, string ipfsHash, uint256 timestamp);
     event AccessGranted(address indexed patient, address indexed user);
     event AccessRevoked(address indexed patient, address indexed user);
-    event RecordMarkedForFunding(address indexed patient, uint256 recordId, bool status);
+    event RecordMarkedForFunding(address indexed patient, uint256 indexed recordId, bool status);
 
     // -----------------------------
     // MODIFIERS
@@ -74,55 +68,74 @@ contract MedicalRecordStorage {
         }
         _;
     }
-    modifier onlyGuardian() {
-        if (msg.sender != patients[msg.sender].guardian) {
-            revert NotAuthorized();
-        }
-        _;
-    }
-    function registerPatient(
-        address _guardian
-    ) external {
+
+    // -----------------------------
+    // PATIENT MANAGEMENT
+    // -----------------------------
+
+    function registerPatient() external {
         if (patients[msg.sender].registered) {
             revert AlreadyRegistered();
         }
 
-        patients[msg.sender] = Patient({
-            registered: true,
-            guardian: _guardian
-        });
+        Patient storage p = patients[msg.sender];
+        p.registered = true;
+        emit PatientRegistered(msg.sender);
+    }
 
-        emit PatientRegistered(msg.sender, _guardian);
+    function setGuardian(address _guardian) external onlyRegisteredPatient {
+        patients[msg.sender].guardian = _guardian;
+        emit GuardianUpdated(msg.sender, _guardian);
     }
     
-    // The `updatePatientProfile` function has been removed as all PII is off-chain.
-
     // -----------------------------
     // RECORD MANAGEMENT
     // -----------------------------
 
-    function uploadRecord(string memory _ipfsHash, string memory _metadata) external onlyRegisteredPatient {
-        patientRecords[msg.sender].push(
-            HealthRecord({
-                ipfsHash: _ipfsHash,
-                metadata: _metadata,
-                timestamp: block.timestamp,
-                sharedForFunding: false
-            })
-        );
+    function uploadRecord(
+        string memory _title,
+        string memory _ipfsHash,
+        string memory _metadata
+    ) external onlyRegisteredPatient {
+        Patient storage p = patients[msg.sender];
+        uint256 recordId = p.recordCount;
 
-        emit RecordUploaded(msg.sender, _ipfsHash, _metadata, block.timestamp);
+        patientRecords[msg.sender][recordId] = HealthRecord({
+            title: _title,
+            ipfsHash: _ipfsHash,
+            metadata: _metadata,
+            timestamp: block.timestamp,
+            sharedForFunding: false
+        });
+
+        p.recordCount++;
+
+        emit RecordUploaded(msg.sender, recordId, _ipfsHash, block.timestamp);
     }
 
     function getMyRecords() external view onlyRegisteredPatient returns (HealthRecord[] memory) {
-        return patientRecords[msg.sender];
+        return _fetchRecords(msg.sender);
     }
 
     function getPatientRecords(address _patient) external view returns (HealthRecord[] memory) {
-        if (msg.sender != _patient && !access[_patient][msg.sender].approved) {
+        if (
+            msg.sender != _patient &&
+            msg.sender != patients[_patient].guardian &&
+            !access[_patient][msg.sender]
+        ) {
             revert AccessDenied();
         }
-        return patientRecords[_patient];
+        return _fetchRecords(_patient);
+    }
+
+    function _fetchRecords(address _patient) internal view returns (HealthRecord[] memory) {
+        Patient storage p = patients[_patient];
+        HealthRecord[] memory records = new HealthRecord[](p.recordCount);
+
+        for (uint256 i = 0; i < p.recordCount; i++) {
+            records[i] = patientRecords[_patient][i];
+        }
+        return records;
     }
 
     // -----------------------------
@@ -130,19 +143,13 @@ contract MedicalRecordStorage {
     // -----------------------------
 
     function grantAccess(address _user) external onlyRegisteredPatient {
-        access[msg.sender][_user] = AccessRequest({
-            exists: true,
-            approved: true
-        });
+        access[msg.sender][_user] = true;
         emit AccessGranted(msg.sender, _user);
     }
 
     function revokeAccess(address _user) external onlyRegisteredPatient {
-        AccessRequest storage req = access[msg.sender][_user];
-        if (!req.exists || !req.approved) {
-            revert NoActiveAccess();
-        }
-        req.approved = false;
+        if (!access[msg.sender][_user]) revert NoActiveAccess();
+        access[msg.sender][_user] = false;
         emit AccessRevoked(msg.sender, _user);
     }
 
@@ -151,32 +158,46 @@ contract MedicalRecordStorage {
     // -----------------------------
 
     function markRecordForFunding(uint256 _recordId, bool _status) external onlyRegisteredPatient {
-        if (_recordId >= patientRecords[msg.sender].length) {
-            revert InvalidRecordId();
+        Patient storage p = patients[msg.sender];
+        if (_recordId >= p.recordCount) revert InvalidRecordId();
+
+        HealthRecord storage record = patientRecords[msg.sender][_recordId];
+        record.sharedForFunding = _status;
+
+        if (_status && !p.isFundingRecord[_recordId]) {
+            p.fundingRecordIds.push(_recordId);
+            p.isFundingRecord[_recordId] = true;
+        } else if (!_status && p.isFundingRecord[_recordId]) {
+            p.isFundingRecord[_recordId] = false;
+
+            // ✅ remove from fundingRecordIds to keep storage clean
+            for (uint256 i = 0; i < p.fundingRecordIds.length; i++) {
+                if (p.fundingRecordIds[i] == _recordId) {
+                    p.fundingRecordIds[i] = p.fundingRecordIds[p.fundingRecordIds.length - 1];
+                    p.fundingRecordIds.pop();
+                    break;
+                }
+            }
         }
-        patientRecords[msg.sender][_recordId].sharedForFunding = _status;
+
         emit RecordMarkedForFunding(msg.sender, _recordId, _status);
     }
 
     function getFundingRecords(address _patient) external view returns (HealthRecord[] memory) {
-        if (msg.sender != _patient && !access[_patient][msg.sender].approved) {
+        if (
+            msg.sender != _patient &&
+            msg.sender != patients[_patient].guardian &&
+            !access[_patient][msg.sender]
+        ) {
             revert AccessDenied();
         }
 
-        uint256 count = 0;
-        for (uint256 i = 0; i < patientRecords[_patient].length; i++) {
-            if (patientRecords[_patient][i].sharedForFunding) {
-                count++;
-            }
-        }
+        Patient storage p = patients[_patient];
+        uint256 count = p.fundingRecordIds.length;
 
         HealthRecord[] memory fundingRecords = new HealthRecord[](count);
-        uint256 idx = 0;
-        for (uint256 i = 0; i < patientRecords[_patient].length; i++) {
-            if (patientRecords[_patient][i].sharedForFunding) {
-                fundingRecords[idx] = patientRecords[_patient][i];
-                idx++;
-            }
+        for (uint256 i = 0; i < count; i++) {
+            fundingRecords[i] = patientRecords[_patient][p.fundingRecordIds[i]];
         }
         return fundingRecords;
     }
