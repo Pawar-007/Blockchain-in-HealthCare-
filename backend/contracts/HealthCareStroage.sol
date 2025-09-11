@@ -30,6 +30,7 @@ contract MedicalRecordStorage {
         string metadata;        // JSON metadata
         uint256 timestamp;
         bool sharedForFunding;
+        address doctor;         // ✅ Doctor who uploaded the record
     }
 
     // -----------------------------
@@ -46,7 +47,13 @@ contract MedicalRecordStorage {
 
     event PatientRegistered(address indexed patient);
     event GuardianUpdated(address indexed patient, address indexed newGuardian);
-    event RecordUploaded(address indexed patient, uint256 indexed recordId, string ipfsHash, uint256 timestamp);
+    event RecordUploaded(
+        address indexed patient,
+        uint256 indexed recordId,
+        string ipfsHash,
+        uint256 timestamp,
+        address indexed doctor
+    );
     event AccessGranted(address indexed patient, address indexed user);
     event AccessRevoked(address indexed patient, address indexed user);
     event RecordMarkedForFunding(address indexed patient, uint256 indexed recordId, bool status);
@@ -105,12 +112,13 @@ contract MedicalRecordStorage {
             ipfsHash: _ipfsHash,
             metadata: _metadata,
             timestamp: block.timestamp,
-            sharedForFunding: false
+            sharedForFunding: false,
+            doctor: msg.sender // ✅ store doctor
         });
 
         p.recordCount++;
 
-        emit RecordUploaded(msg.sender, recordId, _ipfsHash, block.timestamp);
+        emit RecordUploaded(msg.sender, recordId, _ipfsHash, block.timestamp, msg.sender);
     }
 
     function getMyRecords() external view onlyRegisteredPatient returns (HealthRecord[] memory) {
