@@ -182,6 +182,11 @@ const healthCareFundingAbi = [
 				"internalType": "string",
 				"name": "diseaseType",
 				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "goalAmount",
+				"type": "uint256"
 			}
 		],
 		"name": "createRequest",
@@ -193,11 +198,37 @@ const healthCareFundingAbi = [
 		"inputs": [
 			{
 				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "crowdDonorAmounts",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
 				"name": "patient",
 				"type": "address"
 			}
 		],
 		"name": "donate",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "donateToCrowd",
 		"outputs": [],
 		"stateMutability": "payable",
 		"type": "function"
@@ -295,6 +326,11 @@ const healthCareFundingAbi = [
 					{
 						"internalType": "uint256",
 						"name": "totalFunded",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "goalAmount",
 						"type": "uint256"
 					},
 					{
@@ -410,6 +446,11 @@ const healthCareFundingAbi = [
 					{
 						"internalType": "uint256",
 						"name": "totalFunded",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "goalAmount",
 						"type": "uint256"
 					},
 					{
@@ -557,6 +598,24 @@ const healthCareFundingAbi = [
 			{
 				"internalType": "uint256",
 				"name": "totalFunded",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "goalAmount",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalCrowdFunded",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
 				"type": "uint256"
 			}
 		],

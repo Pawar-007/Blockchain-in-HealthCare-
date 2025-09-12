@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { healthCareFundingAbi, storageAbi, HospitalRegistryAbi } from "../contractIntegration/contractAbi.js";
+import { healthCareFundingAbi, storageAbi, hospitalRegistryAbi } from "../contractIntegration/contractAbi.js";
 
 const FUNDING_ADDRESS = import.meta.env.VITE_FUNDING_ADDRESS;
 const STORAGE_ADDRESS = import.meta.env.VITE_STORAGE_ADDRESS;
@@ -45,11 +45,21 @@ export const ContractProvider = ({ children }) => {
       autoConnect();
     }
   }, []);
+  //logout
+   const disconnectWallet = () => {
+    setProvider(null);
+    setSigner(null);
+    setContracts({});
+    setAccount(null);
+    sessionStorage.removeItem("connectedWallet");
+    console.log("Wallet disconnected");
+  };
+
 
   const initContracts = (ethProvider, signer, account) => {
     const funding = new ethers.Contract(FUNDING_ADDRESS, healthCareFundingAbi, signer);
     const storage = new ethers.Contract(STORAGE_ADDRESS, storageAbi, signer);
-    const hospital = new ethers.Contract(HOSPITAL_ADDRESS, HospitalRegistryAbi, signer);
+    const hospital = new ethers.Contract(HOSPITAL_ADDRESS, hospitalRegistryAbi, signer);
 
     setProvider(ethProvider);
     setSigner(signer);
@@ -58,7 +68,7 @@ export const ContractProvider = ({ children }) => {
   };
 
   return (
-    <ContractContext.Provider value={{ provider, signer, account, ...contracts, connectWallet }}>
+    <ContractContext.Provider value={{ provider, signer, account, ...contracts, connectWallet,disconnectWallet }}>
       {children}
     </ContractContext.Provider>
   );
