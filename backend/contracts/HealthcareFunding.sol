@@ -9,16 +9,17 @@ contract HealthcareFunding {
         address patient;
         string name;
         string description;
+        uint256 createdAt;          
         uint256 deadline;
         address hospitalWallet;
-        string reportCID;
         string diseaseType;
         bool patientCallVerified;
         bool hospitalCrosscheckVerified;
         bool physicalVisitVerified;
-        bool visible;   // becomes true after verification
+        bool visible;               // becomes true after verification
         bool active;
         uint256 totalFunded;
+        string[] medicalRecords;    // array of IPFS CIDs
     }
 
     // -----------------------------
@@ -30,6 +31,7 @@ contract HealthcareFunding {
     // Each patient wallet => their funding request
     mapping(address => Request) public requestsByPatient;
     address[] public patientList;
+
     // Donor tracking (patient -> donor -> amount)
     mapping(address => mapping(address => uint256)) public donorAmounts;
 
@@ -40,6 +42,7 @@ contract HealthcareFunding {
     event RequestVisible(address indexed patient);
     event Donated(address indexed patient, address indexed donor, uint256 amount);
     event FundsReleased(address indexed patient, uint256 amount, address hospitalWallet);
+    event MedicalRecordAdded(address indexed patient, string cid);
 
     // -----------------------------
     // MODIFIERS
@@ -81,7 +84,6 @@ contract HealthcareFunding {
         string memory description,
         uint256 deadline,
         address hospitalWallet,
-        string memory reportCID,
         string memory diseaseType
     ) external {
         Request storage r = requestsByPatient[msg.sender];
@@ -91,19 +93,31 @@ contract HealthcareFunding {
             patient: msg.sender,
             name: name,
             description: description,
+            createdAt: block.timestamp,  // store request creation time
             deadline: deadline,
             hospitalWallet: hospitalWallet,
-            reportCID: reportCID,
             diseaseType: diseaseType,
             patientCallVerified: false,
             hospitalCrosscheckVerified: false,
             physicalVisitVerified: false,
             visible: false,
             active: true,
-            totalFunded: 0
+            totalFunded: 0,
+            medicalRecords: new string[](0)  // initialize empty array
         });
+
         patientList.push(msg.sender);
         emit RequestCreated(msg.sender, name, diseaseType);
+    }
+
+    // -----------------------------
+    // MEDICAL RECORD MANAGEMENT
+    // -----------------------------
+    function addMedicalRecord(string memory cid) external {
+        Request storage r = requestsByPatient[msg.sender];
+        require(r.active, "Request is not active");
+        r.medicalRecords.push(cid);
+        emit MedicalRecordAdded(msg.sender, cid);
     }
 
     // -----------------------------
@@ -182,15 +196,15 @@ contract HealthcareFunding {
     function getDonation(address patient, address donor) external view returns (uint256) {
         return donorAmounts[patient][donor];
     }
+
     function getAllRequests() external view returns (Request[] memory) {
-    uint256 total = patientList.length;
-    Request[] memory all = new Request[](total);
+        uint256 total = patientList.length;
+        Request[] memory all = new Request[](total);
 
-    for (uint i = 0; i < total; i++) {
-        all[i] = requestsByPatient[patientList[i]];
+        for (uint i = 0; i < total; i++) {
+            all[i] = requestsByPatient[patientList[i]];
+        }
+
+        return all;
     }
-
-    return all;
-}
-
 }
