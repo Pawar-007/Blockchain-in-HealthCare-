@@ -1,7 +1,8 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import lighthouse from "@lighthouse-web3/sdk";
 import Button from "../ui/Button.jsx";
-import {Input} from "../ui/Input.jsx";
-import {Label} from "../ui/Label.jsx";
+import { Input } from "../ui/Input.jsx";
+import { Label } from "../ui/Label.jsx";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,8 @@ import {
 } from "../ui/Dialog.jsx";
 import { useToast } from "../ui/use-toast.jsx";
 import { Upload, FileText, Loader2 } from "lucide-react";
-
+import { uploadToLighthouse } from "../../ipfsIntegration/uploadOnIpfs.js";
+import { useContracts } from "../../context/ContractContext.jsx";
 export function UploadRecordDialog() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -21,47 +23,105 @@ export function UploadRecordDialog() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [cid, setCid] = useState(null);
   const { toast } = useToast();
+  const { storage  } = useContracts();
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) setFile(selectedFile);
-  };
+        const handleFileChange = (e) => {
+          const selectedFile = e.target.files?.[0];
+          if (selectedFile) setFile(selectedFile);
+        };
 
-  const handleUpload = async () => {
-    if (!title || !doctor || !description || !file) {
-      toast({
-        title: "Missing details",
-        description: "Please fill all fields and select a file.",
-        variant: "destructive",
-      });
-      return;
-    }
+      const handleUpload = async () => {
+        if (!title || !doctor || !description || !file) {
+          toast({
+            title: "Missing details",
+            description: "Please fill all fields and select a file.",
+            variant: "destructive",
+          });
+          return;
+        }
 
-    setIsUploading(true);
-    toast({ title: "Uploading...", description: "Please wait." });
+        setIsUploading(true);
+        toast({ title: "Uploading...", description: "Please wait." });
 
-    // Fake IPFS upload
-    await new Promise((res) => setTimeout(res, 2000));
+        try {
+          // 1️⃣ Upload file to Lighthouse
+          const cid = await uploadToLighthouse(file);
+          setCid(cid);
 
-    toast({
-      title: "Success!",
-      description: "Medical record uploaded and stored on blockchain.",
-    });
+          if (!cid) throw new Error("Failed to get CID from Lighthouse.");
 
-    // Reset form
-    setTitle("");
-    setDoctor("");
-    setDescription("");
-    setFile(null);
-    setIsUploading(false);
-    setOpen(false);
-  };
+          toast({
+            title: "File uploaded",
+            description: `CID: ${cid}`,
+          });
+
+          // 2️⃣ Send to blockchain
+          const tx = await storage.uploadRecord(
+            title,
+            cid,
+            description,
+            doctor
+          );
+
+          toast({
+            title: "Confirming blockchain transaction...",
+            description: "Please wait for confirmation",
+          });
+
+          const receipt = await tx.wait(); // wait for mined tx
+          console.log("Transaction receipt:", receipt);
+
+          // 3️⃣ Extract event data
+          const event = receipt.events?.find(
+            (e) => e.event === "RecordUploaded"
+          );
+
+          if (event) {
+            const { patient, recordId, ipfsHash, timestamp, sender } = event.args;
+            console.log("RecordUploaded event:", { patient, recordId: recordId.toString(), ipfsHash, timestamp: timestamp.toString(), sender });
+
+            toast({
+              title: "Record stored on blockchain",
+              description: `Record ID: ${recordId.toString()}, CID: ${ipfsHash}`,
+            });
+          } else {
+            console.warn("No RecordUploaded event found");
+            toast({
+              title: "Blockchain stored, but no event found",
+              description: `CID: ${cid}`,
+            });
+          }
+
+          // 4Reset form
+          setTitle("");
+          setDoctor("");
+          setDescription("");
+          setFile(null);
+          setOpen(false);
+          setCid(null);
+
+        } catch (err) {
+          console.error("Upload failed:", err);
+          toast({
+            title: "Upload failed",
+            description: err.message || "Something went wrong",
+            variant: "destructive",
+          });
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="flex flex-col items-center gap-2 h-20">
+        <Button
+          variant="outline"
+          className="flex flex-col items-center gap-2 h-20"
+        >
           <Upload className="h-6 w-6" /> Upload Medical Record
         </Button>
       </DialogTrigger>
@@ -118,14 +178,33 @@ export function UploadRecordDialog() {
             />
             {file && (
               <p className="text-xs text-muted-foreground">
-                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                Selected: {file.name} (
+                {(file.size / 1024 / 1024).toFixed(2)} MB)
               </p>
             )}
           </div>
+
+          {cid && (
+            <p className="text-sm text-green-600 break-all">
+              ✅ Uploaded! CID:{" "}
+              <a
+                href={`https://gateway.lighthouse.storage/ipfs/${cid}`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline text-blue-600"
+              >
+                {cid}
+              </a>
+            </p>
+          )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isUploading}>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={isUploading}
+          >
             Cancel
           </Button>
           <Button
@@ -148,4 +227,5 @@ export function UploadRecordDialog() {
     </Dialog>
   );
 }
+
 export default UploadRecordDialog;

@@ -1,4 +1,112 @@
-const healthCareFundingAbi = [
+const healthCareFundingAbi =[
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_admin",
+				"type": "address"
+			}
+		],
+		"name": "addAdmin",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "cid",
+				"type": "string"
+			}
+		],
+		"name": "addMedicalRecord",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "description",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "deadline",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "hospitalWallet",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "diseaseType",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "contactNumber",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "goalAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "createRequest",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "patient",
+				"type": "address"
+			}
+		],
+		"name": "donate",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "patient",
+				"type": "address"
+			}
+		],
+		"name": "releaseFunds",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_admin",
+				"type": "address"
+			}
+		],
+		"name": "removeAdmin",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -28,6 +136,13 @@ const healthCareFundingAbi = [
 		],
 		"name": "Donated",
 		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "donateToCrowd",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -115,11 +230,11 @@ const healthCareFundingAbi = [
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_admin",
+				"name": "patient",
 				"type": "address"
 			}
 		],
-		"name": "addAdmin",
+		"name": "verifyHospitalCrosscheck",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -127,12 +242,25 @@ const healthCareFundingAbi = [
 	{
 		"inputs": [
 			{
-				"internalType": "string",
-				"name": "cid",
-				"type": "string"
+				"internalType": "address",
+				"name": "patient",
+				"type": "address"
 			}
 		],
-		"name": "addMedicalRecord",
+		"name": "verifyPatientCall",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "patient",
+				"type": "address"
+			}
+		],
+		"name": "verifyPhysicalVisit",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -159,44 +287,6 @@ const healthCareFundingAbi = [
 	{
 		"inputs": [
 			{
-				"internalType": "string",
-				"name": "name",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "description",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "deadline",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "hospitalWallet",
-				"type": "address"
-			},
-			{
-				"internalType": "string",
-				"name": "diseaseType",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "goalAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "createRequest",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -211,26 +301,6 @@ const healthCareFundingAbi = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "patient",
-				"type": "address"
-			}
-		],
-		"name": "donate",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "donateToCrowd",
-		"outputs": [],
-		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -314,6 +384,11 @@ const healthCareFundingAbi = [
 						"type": "bool"
 					},
 					{
+						"internalType": "string",
+						"name": "contactNumber",
+						"type": "string"
+					},
+					{
 						"internalType": "bool",
 						"name": "visible",
 						"type": "bool"
@@ -321,6 +396,11 @@ const healthCareFundingAbi = [
 					{
 						"internalType": "bool",
 						"name": "active",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "isFunded",
 						"type": "bool"
 					},
 					{
@@ -434,6 +514,11 @@ const healthCareFundingAbi = [
 						"type": "bool"
 					},
 					{
+						"internalType": "string",
+						"name": "contactNumber",
+						"type": "string"
+					},
+					{
 						"internalType": "bool",
 						"name": "visible",
 						"type": "bool"
@@ -441,6 +526,11 @@ const healthCareFundingAbi = [
 					{
 						"internalType": "bool",
 						"name": "active",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "isFunded",
 						"type": "bool"
 					},
 					{
@@ -497,32 +587,6 @@ const healthCareFundingAbi = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "patient",
-				"type": "address"
-			}
-		],
-		"name": "releaseFunds",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_admin",
-				"type": "address"
-			}
-		],
-		"name": "removeAdmin",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -586,6 +650,11 @@ const healthCareFundingAbi = [
 				"type": "bool"
 			},
 			{
+				"internalType": "string",
+				"name": "contactNumber",
+				"type": "string"
+			},
+			{
 				"internalType": "bool",
 				"name": "visible",
 				"type": "bool"
@@ -593,6 +662,11 @@ const healthCareFundingAbi = [
 			{
 				"internalType": "bool",
 				"name": "active",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "isFunded",
 				"type": "bool"
 			},
 			{
@@ -620,45 +694,6 @@ const healthCareFundingAbi = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "patient",
-				"type": "address"
-			}
-		],
-		"name": "verifyHospitalCrosscheck",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "patient",
-				"type": "address"
-			}
-		],
-		"name": "verifyPatientCall",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "patient",
-				"type": "address"
-			}
-		],
-		"name": "verifyPhysicalVisit",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	}
 ]
@@ -887,9 +922,9 @@ const storageAbi =[
 						"type": "bool"
 					},
 					{
-						"internalType": "address",
-						"name": "doctor",
-						"type": "address"
+						"internalType": "string",
+						"name": "doctorName",
+						"type": "string"
 					}
 				],
 				"internalType": "struct MedicalRecordStorage.HealthRecord[]",
@@ -932,9 +967,9 @@ const storageAbi =[
 						"type": "bool"
 					},
 					{
-						"internalType": "address",
-						"name": "doctor",
-						"type": "address"
+						"internalType": "string",
+						"name": "doctorName",
+						"type": "string"
 					}
 				],
 				"internalType": "struct MedicalRecordStorage.HealthRecord[]",
@@ -983,9 +1018,9 @@ const storageAbi =[
 						"type": "bool"
 					},
 					{
-						"internalType": "address",
-						"name": "doctor",
-						"type": "address"
+						"internalType": "string",
+						"name": "doctorName",
+						"type": "string"
 					}
 				],
 				"internalType": "struct MedicalRecordStorage.HealthRecord[]",
@@ -1076,6 +1111,11 @@ const storageAbi =[
 				"internalType": "string",
 				"name": "_metadata",
 				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_doctorName",
+				"type": "string"
 			}
 		],
 		"name": "uploadRecord",
@@ -1084,8 +1124,7 @@ const storageAbi =[
 		"type": "function"
 	}
 ]
-
-const hospitalRegistryAbi = [
+const hospitalRegistryAbi =[
 	{
 		"inputs": [
 			{
@@ -1191,6 +1230,67 @@ const hospitalRegistryAbi = [
 	{
 		"inputs": [
 			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_location",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_documentCID",
+				"type": "string"
+			}
+		],
+		"name": "registerHospital",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_hospital",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "_status",
+				"type": "bool"
+			}
+		],
+		"name": "verifyHospital",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_hospital",
 				"type": "address"
@@ -1267,67 +1367,6 @@ const hospitalRegistryAbi = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "_name",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "_location",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "_documentCID",
-				"type": "string"
-			}
-		],
-		"name": "registerHospital",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_hospital",
-				"type": "address"
-			},
-			{
-				"internalType": "bool",
-				"name": "_status",
-				"type": "bool"
-			}
-		],
-		"name": "verifyHospital",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	}
 ]

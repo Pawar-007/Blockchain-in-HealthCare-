@@ -24,14 +24,15 @@ contract MedicalRecordStorage {
         mapping(uint256 => bool) isFundingRecord; // fast lookup
     }
 
-    struct HealthRecord {
+        struct HealthRecord {
         string title;           
         string ipfsHash;        // Encrypted file stored on IPFS
         string metadata;        // JSON metadata
         uint256 timestamp;
         bool sharedForFunding;
-        address doctor;         // ✅ Doctor who uploaded the record
+        string doctorName;      // ✅ Doctor's name instead of address
     }
+
 
     // -----------------------------
     // STATE VARIABLES
@@ -102,7 +103,8 @@ contract MedicalRecordStorage {
     function uploadRecord(
         string memory _title,
         string memory _ipfsHash,
-        string memory _metadata
+        string memory _metadata,
+        string memory _doctorName   // ✅ take doctor name as input
     ) external onlyRegisteredPatient {
         Patient storage p = patients[msg.sender];
         uint256 recordId = p.recordCount;
@@ -113,13 +115,14 @@ contract MedicalRecordStorage {
             metadata: _metadata,
             timestamp: block.timestamp,
             sharedForFunding: false,
-            doctor: msg.sender // ✅ store doctor
+            doctorName: _doctorName   // ✅ save name instead of msg.sender
         });
 
         p.recordCount++;
 
         emit RecordUploaded(msg.sender, recordId, _ipfsHash, block.timestamp, msg.sender);
     }
+
 
     function getMyRecords() external view onlyRegisteredPatient returns (HealthRecord[] memory) {
         return _fetchRecords(msg.sender);

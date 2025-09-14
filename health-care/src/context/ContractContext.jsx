@@ -25,7 +25,11 @@ export const ContractProvider = ({ children }) => {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       const signer = await ethProvider.getSigner();
       initContracts(ethProvider, signer, accounts[0]);
-
+      console.log({
+        "Connected account": accounts[0],
+        "ethProvider": ethProvider,
+        "signer": signer
+      });
       // ✅ Store wallet address in sessionStorage
       sessionStorage.setItem("connectedWallet", accounts[0]);
     } catch (err) {
@@ -40,6 +44,7 @@ export const ContractProvider = ({ children }) => {
       const autoConnect = async () => {
         const ethProvider = new ethers.BrowserProvider(window.ethereum);
         const signer = await ethProvider.getSigner();
+        console.log("signer", signer);
         initContracts(ethProvider, signer, savedWallet);
       };
       autoConnect();
@@ -60,11 +65,11 @@ export const ContractProvider = ({ children }) => {
     const funding = new ethers.Contract(FUNDING_ADDRESS, healthCareFundingAbi, signer);
     const storage = new ethers.Contract(STORAGE_ADDRESS, storageAbi, signer);
     const hospital = new ethers.Contract(HOSPITAL_ADDRESS, hospitalRegistryAbi, signer);
-
     setProvider(ethProvider);
     setSigner(signer);
     setContracts({ funding, storage, hospital });
     setAccount(account);
+    console.log("Contracts initialized", { funding, storage, hospital });
   };
 
   return (

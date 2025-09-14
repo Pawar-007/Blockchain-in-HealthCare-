@@ -1,21 +1,30 @@
+const hre = require("hardhat");
+
 async function main() {
-  // Use the first account (Account #0)
-  const [deployer] = await ethers.getSigners();
-  console.log("Deploying contracts with:", deployer.address);
+  const [deployer] = await hre.ethers.getSigners();
+  console.log("Deploying contracts with account:", deployer.address);
 
-  // Get the contract factory
-  const HF = await ethers.getContractFactory("HealthcareFundingOrchestrator");
+  const HealthcareFunding = await hre.ethers.getContractFactory("HealthcareFunding");
+  const healthcareFunding = await HealthcareFunding.deploy();
+  await healthcareFunding.waitForDeployment(); 
+  console.log("HealthcareFunding deployed at:", healthcareFunding.target);
 
-  // Deploy contract
-  const hf = await HF.deploy();
-  await hf.deployed();
+  // MedicalRecordStorage
+  const MedicalRecordStorage = await hre.ethers.getContractFactory("MedicalRecordStorage");
+  const medicalRecordStorage = await MedicalRecordStorage.deploy();
+  await medicalRecordStorage.waitForDeployment();
+  console.log("MedicalRecordStorage deployed at:", medicalRecordStorage.target);
 
-  console.log("HealthcareFundingOrchestrator deployed at:", hf.address);
+  // 3HospitalRegistry
+  const HospitalRegistry = await hre.ethers.getContractFactory("HospitalRegistry");
+  const hospitalRegistry = await HospitalRegistry.deploy(deployer.address); // initialOwner
+  await hospitalRegistry.waitForDeployment();
+  console.log("HospitalRegistry deployed at:", hospitalRegistry.target);
 }
 
 main()
   .then(() => process.exit(0))
-  .catch(error => {
+  .catch((error) => {
     console.error(error);
     process.exit(1);
   });

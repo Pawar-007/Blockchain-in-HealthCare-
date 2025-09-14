@@ -25,12 +25,29 @@ const navItems = [
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const {account, connectWallet,disconnectWallet} = useContracts();
+  const {account, connectWallet,disconnectWallet,storage} = useContracts();
 
-  const handleConnectWallet = async () => {
-    console.log("Connecting wallet...",account);
-    await connectWallet();
-  }
+   const handleConnectWallet = async () => {
+    try {
+      console.log("Connecting wallet...");
+      const connected=await connectWallet();
+      console.log("Wallet connected:",await storage,await account);
+      if (storage && account) {
+        const patient = await storage.patients(account);
+        if (!patient.registered) {
+          console.log("Not registered → Registering...");
+          const tx = await storage.registerPatient();
+          await tx.wait();
+          console.log("Patient registered successfully");
+        } else {
+          console.log("Patient already registered");
+        }
+      }
+    } catch (err) {
+      console.error("Wallet connect or register failed:", err);
+    }
+  };
+
   const handleDisconnectWallet =async () => {
     console.log("Disconnecting wallet...");
     await disconnectWallet();

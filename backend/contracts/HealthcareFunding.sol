@@ -6,23 +6,24 @@ contract HealthcareFunding {
     // STRUCTS
     // -----------------------------
     struct Request {
-    address patient;
-    string name;
-    string description;
-    uint256 createdAt;
-    uint256 deadline;
-    address hospitalWallet;
-    string diseaseType;
-    bool patientCallVerified;
-    bool hospitalCrosscheckVerified;
-    bool physicalVisitVerified;
-    bool visible;
-    bool active;
-    uint256 totalFunded;
-    uint256 goalAmount;          // NEW: total needed
-    string[] medicalRecords;
-}
-
+        address patient;
+        string name;
+        string description;
+        uint256 createdAt;
+        uint256 deadline;
+        address hospitalWallet;
+        string diseaseType;
+        bool patientCallVerified;
+        bool hospitalCrosscheckVerified;
+        bool physicalVisitVerified;
+        string contactNumber;  
+        bool visible;
+        bool active;
+        bool isFunded;            
+        uint256 totalFunded;
+        uint256 goalAmount;
+        string[] medicalRecords;
+    }
 
     // -----------------------------
     // STATE
@@ -81,51 +82,54 @@ contract HealthcareFunding {
     // -----------------------------
     // REQUEST CREATION
     // -----------------------------
-    function createRequest(
-    string memory name,
-    string memory description,
-    uint256 deadline,
-    address hospitalWallet,
-    string memory diseaseType,
-    uint256 goalAmount       // NEW parameter
-) external {
-    Request storage r = requestsByPatient[msg.sender];
-    require(!r.active, "Already has active request");
+     function createRequest(
+        string memory name,
+        string memory description,
+        uint256 deadline,
+        address hospitalWallet,
+        string memory diseaseType,
+        string memory contactNumber,   // ✅ take phone number as input
+        uint256 goalAmount
+    ) external {
+        Request storage r = requestsByPatient[msg.sender];
+        require(!r.active, "Already has active request");
 
-    requestsByPatient[msg.sender] = Request({
-        patient: msg.sender,
-        name: name,
-        description: description,
-        createdAt: block.timestamp,
-        deadline: deadline,
-        hospitalWallet: hospitalWallet,
-        diseaseType: diseaseType,
-        patientCallVerified: false,
-        hospitalCrosscheckVerified: false,
-        physicalVisitVerified: false,
-        visible: false,
-        active: true,
-        totalFunded: 0,
-        goalAmount: goalAmount,       // store target
-        medicalRecords: new string[](0)
-    });
+        requestsByPatient[msg.sender] = Request({
+            patient: msg.sender,
+            name: name,
+            description: description,
+            createdAt: block.timestamp,
+            deadline: deadline,
+            hospitalWallet: hospitalWallet,
+            diseaseType: diseaseType,
+            contactNumber: contactNumber,   // ✅ store it
+            patientCallVerified: false,
+            hospitalCrosscheckVerified: false,
+            physicalVisitVerified: false,
+            visible: false,
+            active: true,
+            isFunded: false,
+            totalFunded: 0,
+            goalAmount: goalAmount,
+            medicalRecords: new string[](0)
+        });
 
-    patientList.push(msg.sender);
-    emit RequestCreated(msg.sender, name, diseaseType);
-}
+        patientList.push(msg.sender);
+        emit RequestCreated(msg.sender, name, diseaseType);
+    }
+
 
     uint256 public totalCrowdFunded;
     mapping(address => uint256) public crowdDonorAmounts;
 
     function donateToCrowd() external payable {
-    require(msg.value > 0, "Must send ETH");
+        require(msg.value > 0, "Must send ETH");
 
-    crowdDonorAmounts[msg.sender] += msg.value; // track per donor
-    totalCrowdFunded += msg.value;              // total pool
+        crowdDonorAmounts[msg.sender] += msg.value;
+        totalCrowdFunded += msg.value;
 
-    // emit an event for frontend
-    emit Donated(address(0), msg.sender, msg.value);
-}
+        emit Donated(address(0), msg.sender, msg.value);
+    }
 
     // -----------------------------
     // MEDICAL RECORD MANAGEMENT
@@ -172,20 +176,18 @@ contract HealthcareFunding {
     // DONATIONS
     // -----------------------------
     function donate(address patient) external payable {
-    Request storage r = requestsByPatient[patient];
-    require(r.active, "Inactive request");
-    require(r.visible, "Not verified yet");
-    require(block.timestamp <= r.deadline, "Deadline passed");
-    require(msg.value > 0, "Must send ETH");
+        Request storage r = requestsByPatient[patient];
+        require(r.active, "Inactive request");
+        require(r.visible, "Not verified yet");
+        require(!r.isFunded, "Funds already released"); // ✅ block if funded
+        require(block.timestamp <= r.deadline, "Deadline passed");
+        require(msg.value > 0, "Must send ETH");
 
-    // Track individual donor amount
-    donorAmounts[patient][msg.sender] += msg.value;
+        donorAmounts[patient][msg.sender] += msg.value;
+        r.totalFunded += msg.value;
 
-    // Update total funded amount
-    r.totalFunded += msg.value;
-
-    emit Donated(patient, msg.sender, msg.value);
-}
+        emit Donated(patient, msg.sender, msg.value);
+    }
 
     // -----------------------------
     // FUND RELEASE
@@ -194,11 +196,13 @@ contract HealthcareFunding {
         Request storage r = requestsByPatient[patient];
         require(r.active, "Inactive request");
         require(r.visible, "Not verified");
+        require(!r.isFunded, "Already funded"); // ✅ cannot fund twice
         require(r.totalFunded > 0, "No funds");
 
         uint256 amount = r.totalFunded;
         r.totalFunded = 0;
         r.active = false;
+        r.isFunded = true; // ✅ mark as funded
 
         (bool success, ) = r.hospitalWallet.call{value: amount}("");
         require(success, "Transfer failed");
