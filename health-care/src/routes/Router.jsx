@@ -5,7 +5,7 @@ import Dashboard from "../pages/Dashboard.jsx";
 import Hospital from "../pages/Hospital.jsx";
 import Index from "../pages/Index.jsx";
 const Router = () => {
-  return (   // ✅ you forgot this "return"
+  return (  
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />

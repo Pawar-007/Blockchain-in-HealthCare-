@@ -13,6 +13,7 @@ export const ContractProvider = ({ children }) => {
   const [signer, setSigner] = useState(null);
   const [contracts, setContracts] = useState({});
   const [account, setAccount] = useState(null);
+  const [hasCheckedRegistration, setHasCheckedRegistration] = useState(false);
 
   // Connect wallet manually
   const connectWallet = async () => {
@@ -70,7 +71,29 @@ export const ContractProvider = ({ children }) => {
     setContracts({ funding, storage, hospital });
     setAccount(account);
     console.log("Contracts initialized", { funding, storage, hospital });
+    
+    
   };
+  
+  const registerPatient = async () => {
+  if (!contracts?.storage || !account) return;
+
+  try {
+    console.log("Attempting patient registration...");
+    const tx = await contracts.storage.registerPatient(account);
+    await tx.wait();
+    console.log(" Patient registered successfully");
+  } catch (err) {
+    // Ignore errors like "already registered"
+    console.log("ℹ️ Registration skipped (probably already registered)", err.reason || err.message);
+  }
+};
+
+   useEffect(() => {
+  if (contracts?.storage && account) {
+    registerPatient();
+  }
+}, [contracts, account]);
 
   return (
     <ContractContext.Provider value={{ provider, signer, account, ...contracts, connectWallet,disconnectWallet }}>

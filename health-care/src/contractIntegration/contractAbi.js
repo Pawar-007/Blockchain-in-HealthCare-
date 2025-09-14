@@ -1047,6 +1047,25 @@ const storageAbi =[
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_patient",
+				"type": "address"
+			}
+		],
+		"name": "isRegistered",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "_recordId",
 				"type": "uint256"
@@ -1063,7 +1082,13 @@ const storageAbi =[
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_patient",
+				"type": "address"
+			}
+		],
 		"name": "registerPatient",
 		"outputs": [],
 		"stateMutability": "nonpayable",

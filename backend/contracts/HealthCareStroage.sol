@@ -81,15 +81,17 @@ contract MedicalRecordStorage {
     // PATIENT MANAGEMENT
     // -----------------------------
 
-    function registerPatient() external {
-        if (patients[msg.sender].registered) {
-            revert AlreadyRegistered();
+    function registerPatient(address _patient) external {
+            if (patients[_patient].registered) {
+                revert AlreadyRegistered();
+            }
+
+            Patient storage p = patients[_patient];
+            p.registered = true;
+
+            emit PatientRegistered(_patient);
         }
 
-        Patient storage p = patients[msg.sender];
-        p.registered = true;
-        emit PatientRegistered(msg.sender);
-    }
 
     function setGuardian(address _guardian) external onlyRegisteredPatient {
         patients[msg.sender].guardian = _guardian;
@@ -127,7 +129,10 @@ contract MedicalRecordStorage {
     function getMyRecords() external view onlyRegisteredPatient returns (HealthRecord[] memory) {
         return _fetchRecords(msg.sender);
     }
-
+     
+    function isRegistered(address _patient) external view returns (bool) {
+    return patients[_patient].registered;
+    }
     function getPatientRecords(address _patient) external view returns (HealthRecord[] memory) {
         if (
             msg.sender != _patient &&

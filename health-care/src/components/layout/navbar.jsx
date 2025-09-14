@@ -30,19 +30,8 @@ export default function Navbar() {
    const handleConnectWallet = async () => {
     try {
       console.log("Connecting wallet...");
-      const connected=await connectWallet();
-      console.log("Wallet connected:",await storage,await account);
-      if (storage && account) {
-        const patient = await storage.patients(account);
-        if (!patient.registered) {
-          console.log("Not registered → Registering...");
-          const tx = await storage.registerPatient();
-          await tx.wait();
-          console.log("Patient registered successfully");
-        } else {
-          console.log("Patient already registered");
-        }
-      }
+      await connectWallet();
+      
     } catch (err) {
       console.error("Wallet connect or register failed:", err);
     }

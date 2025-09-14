@@ -26,7 +26,7 @@ const Dashboard = () => {
     console.log("Connecting wallet...",account);
     await connectWallet();
   }
-  
+  console.log("Records:",medicalRecords);
   useEffect(() => {
       if (!account || !storage) return;
 
@@ -176,7 +176,8 @@ const Dashboard = () => {
               </div>
               <div>
                 <h3 className="font-semibold">{record.title}</h3>
-                <p className="text-sm text-gray-500">{record.type} • {record.doctor} • {record.hospital}</p>
+                <p className="text-sm text-gray-500">{record.metadata}</p>
+                <p className="text-sm text-gray-500">Doctor: {record.doctor}</p>
                 <p className="text-xs text-gray-500 mt-1">{record.date} • {record.size}</p>
               </div>
             </div>

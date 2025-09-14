@@ -33,86 +33,69 @@ export function UploadRecordDialog() {
         };
 
       const handleUpload = async () => {
-        if (!title || !doctor || !description || !file) {
-          toast({
-            title: "Missing details",
-            description: "Please fill all fields and select a file.",
-            variant: "destructive",
-          });
-          return;
-        }
+  if (!title || !doctor || !description || !file) {
+    toast({
+      title: "Missing details",
+      description: "Please fill all fields and select a file.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-        setIsUploading(true);
-        toast({ title: "Uploading...", description: "Please wait." });
+  setIsUploading(true);
+  toast({ title: "Uploading...", description: "Please wait." });
 
-        try {
-          // 1️⃣ Upload file to Lighthouse
-          const cid = await uploadToLighthouse(file);
-          setCid(cid);
+  try {
+    // ✅ 1. Ensure patient is registered
+    try {
+      const isRegistered = await storage.isRegistered(account);
+      if (!isRegistered) {
+        const regTx = await storage.registerPatient();
+        await regTx.wait();
+        toast({ title: "Patient registered successfully" });
+      }
+    } catch (regErr) {
+      console.warn("Registration skipped or failed:", regErr.reason);
+    }
 
-          if (!cid) throw new Error("Failed to get CID from Lighthouse.");
+    // ✅ 2. Upload file to Lighthouse
+    const cid = await uploadToLighthouse(file);
+    setCid(cid);
+    toast({ title: "File uploaded", description: `CID: ${cid}` });
 
-          toast({
-            title: "File uploaded",
-            description: `CID: ${cid}`,
-          });
+    // ✅ 3. Send to blockchain
+    const tx = await storage.uploadRecord(title, cid, description, doctor);
+    toast({ title: "Confirming transaction..." });
+    const receipt = await tx.wait();
 
-          // 2️⃣ Send to blockchain
-          const tx = await storage.uploadRecord(
-            title,
-            cid,
-            description,
-            doctor
-          );
+    const event = receipt.events?.find((e) => e.event === "RecordUploaded");
+    if (event) {
+      const { recordId, ipfsHash } = event.args;
+      toast({
+        title: "Record stored on blockchain",
+        description: `Record ID: ${recordId.toString()}, CID: ${ipfsHash}`,
+      });
+      setOpen(false);
+    }
 
-          toast({
-            title: "Confirming blockchain transaction...",
-            description: "Please wait for confirmation",
-          });
-
-          const receipt = await tx.wait(); // wait for mined tx
-          console.log("Transaction receipt:", receipt);
-
-          // 3️⃣ Extract event data
-          const event = receipt.events?.find(
-            (e) => e.event === "RecordUploaded"
-          );
-
-          if (event) {
-            const { patient, recordId, ipfsHash, timestamp, sender } = event.args;
-            console.log("RecordUploaded event:", { patient, recordId: recordId.toString(), ipfsHash, timestamp: timestamp.toString(), sender });
-
-            toast({
-              title: "Record stored on blockchain",
-              description: `Record ID: ${recordId.toString()}, CID: ${ipfsHash}`,
-            });
-          } else {
-            console.warn("No RecordUploaded event found");
-            toast({
-              title: "Blockchain stored, but no event found",
-              description: `CID: ${cid}`,
-            });
-          }
-
-          // 4Reset form
-          setTitle("");
-          setDoctor("");
-          setDescription("");
-          setFile(null);
-          setOpen(false);
-          setCid(null);
-
-        } catch (err) {
-          console.error("Upload failed:", err);
-          toast({
-            title: "Upload failed",
-            description: err.message || "Something went wrong",
-            variant: "destructive",
-          });
-        } finally {
-          setIsUploading(false);
-        }
-      };
+    // ✅ 4. Reset form
+    setTitle("");
+    setDoctor("");
+    setDescription("");
+    setFile(null);
+    setOpen(false);
+    setCid(null);
+  } catch (err) {
+    console.error("Upload failed:", err);
+    toast({
+      title: "Upload failed",
+      description: err.message || "Something went wrong",
+      variant: "destructive",
+    });
+  } finally {
+    setIsUploading(false);
+  }
+};
 
 
   return (

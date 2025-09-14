@@ -1,25 +1,54 @@
 import React from "react";
-
+import { ArrowRight } from "lucide-react";
+import image from "/healthcare-removebg-preview.png"; //  direct from public folder
+import { Link } from "react-router-dom";
 const HeroSection = () => {
   return (
-    <section className="relative bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute top-0 left-0 w-64 h-64 bg-blue-300/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="absolute bottom-0 right-0 w-72 h-72 bg-purple-300/20 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
+    <section className="relative w-full min-h-screen flex items-center justify-center 
+    bg-gradient-to-r from-blue-50 via-white to-green-50 px-6">
+      
+      {/* Full Page Rounded Box */}
+      <div className="w-full max-w-7xl h-auto md:h-[90%] bg-white rounded-3xl shadow-2xl p-10 
+      grid md:grid-cols-2 gap-10 items-center">
+        
+        {/* Left Side - Text */}
+        <div className="text-center md:text-left space-y-6">
+          <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-snug">
+            Every Life Matters <br />
+            <span className="text-blue-700">Get Support for Your Treatment 🩺</span>
+          </h1>
 
-      {/* Hero Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 text-center">
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold leading-tight">
-          Everything You Need for{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Healthcare Funding
-          </span>
-        </h1>
-        <p className="mt-6 max-w-3xl mx-auto text-lg sm:text-xl text-gray-600 dark:text-gray-300">
-          A decentralized and transparent way to request, donate, and manage
-          healthcare funds—ensuring trust, security, and accessibility for
-          everyone.
-        </p>
+          <p className="text-gray-600 text-lg md:text-xl leading-relaxed">
+            Start your medical fundraiser today and connect with people 
+            willing to help. <br />
+            <span className="font-medium text-blue-600">
+              100% Secure • Transparent • Trusted
+            </span>
+          </p>
+
+      <Link
+  to="/"
+  className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 
+  rounded-full font-semibold text-lg hover:bg-blue-700 transition"
+>
+  Start Donating <ArrowRight size={22} />
+</Link>
+        </div>
+
+        {/* Right Side - Illustration */}
+        <div className="flex justify-center md:justify-end relative">
+          <img
+            src={image}
+            alt="Healthcare Illustration"
+            className="w-[80%] md:w-[90%] h-auto object-contain mix-blend-multiply"
+          />
+
+          {/* Floating icons */}
+          <span className="absolute top-10 right-16 text-blue-500 text-3xl md:text-4xl">✦</span>
+          <span className="absolute bottom-14 left-10 text-green-500 text-3xl md:text-4xl">✚</span>
+          <span className="absolute top-32 left-20 text-red-500 text-2xl md:text-3xl"></span>
+          <span className="absolute bottom-20 right-20 text-pink-500 text-2xl md:text-3xl"></span>
+        </div>
       </div>
     </section>
   );
