@@ -94,7 +94,8 @@ export const ContractProvider = ({ children }) => {
     registerPatient();
   }
 }, [contracts, account]);
-
+   
+  
   return (
     <ContractContext.Provider value={{ provider, signer, account, ...contracts, connectWallet,disconnectWallet }}>
       {children}

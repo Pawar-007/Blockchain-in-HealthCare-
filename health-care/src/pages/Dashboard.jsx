@@ -10,6 +10,7 @@ import { UploadRecordDialog } from "../components/component/uploadRecord.jsx"; /
 import {useContracts} from "../context/ContractContext.jsx"
 import { Link } from "react-router-dom";
 import { useToast } from "../components/ui/use-toast.jsx";
+import { useMedicalRecords } from "../context/MedicalRecordContext.jsx";
 import {
   Plus, Heart, FileText, DollarSign, Users, Clock,
   Shield, CheckCircle, TrendingUp, Download, Upload, Eye
@@ -18,7 +19,7 @@ import {
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const {account, connectWallet,disconnectWallet,storage} = useContracts();
-  const [medicalRecords, setMedicalRecords] = useState([]);
+  const { medicalRecords, loading, fetchRecords } = useMedicalRecords();
   const [loadingRecords, setLoadingRecords] = useState(false);
   const { toast } = useToast();
 
@@ -27,37 +28,7 @@ const Dashboard = () => {
     await connectWallet();
   }
   console.log("Records:",medicalRecords);
-  useEffect(() => {
-      if (!account || !storage) return;
-
-      const fetchRecords = async () => {
-        setLoadingRecords(true);
-        try {
-          const records = await storage.getMyRecords();
-          const parsed = records.map((r, idx) => ({
-            id: idx,
-            title: r.title,
-            ipfsHash: r.ipfsHash,
-            metadata: r.metadata,
-            doctor: r.doctorName,
-            date: new Date(Number(r.timestamp) * 1000).toLocaleDateString(),
-            sharedForFunding: r.sharedForFunding,
-          }));
-          setMedicalRecords(parsed);
-        } catch (err) {
-          console.error("Error fetching records:", err);
-          toast({
-            title: "Failed to load records",
-            description: err.message || "Something went wrong",
-            variant: "destructive",
-          });
-        } finally {
-          setLoadingRecords(false);
-        }
-      };
-
-      fetchRecords();
-    }, [account, storage]);
+  
 
   const myCampaigns = [
     { id: 1, title: "Heart Surgery Recovery Fund", goal: 15000, raised: 12500, donors: 89, status: "Active", daysLeft: 12, verificationStatus: "Verified" },
@@ -68,7 +39,8 @@ const Dashboard = () => {
       const handleRecordUpload = () => {
       fetchRecords(); // refresh records from blockchain after upload
     };
-
+    
+    
 
   // Donations
   const donationsMade = [];

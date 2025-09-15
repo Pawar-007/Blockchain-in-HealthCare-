@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import lighthouse from "@lighthouse-web3/sdk";
 import Button from "../ui/Button.jsx";
 import { Input } from "../ui/Input.jsx";
 import { Label } from "../ui/Label.jsx";
@@ -16,6 +15,8 @@ import { useToast } from "../ui/use-toast.jsx";
 import { Upload, FileText, Loader2 } from "lucide-react";
 import { uploadToLighthouse } from "../../ipfsIntegration/uploadOnIpfs.js";
 import { useContracts } from "../../context/ContractContext.jsx";
+import { useMedicalRecords } from "../../context/MedicalRecordContext.jsx"; // ✅ import context
+
 export function UploadRecordDialog() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -24,79 +25,81 @@ export function UploadRecordDialog() {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [cid, setCid] = useState(null);
+
   const { toast } = useToast();
-  const { storage  } = useContracts();
+  const { account, storage } = useContracts();
+  const { fetchRecords,addRecord  } = useMedicalRecords(); // ✅ get fetchRecords from context
 
-        const handleFileChange = (e) => {
-          const selectedFile = e.target.files?.[0];
-          if (selectedFile) setFile(selectedFile);
-        };
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) setFile(selectedFile);
+  };
 
-      const handleUpload = async () => {
-  if (!title || !doctor || !description || !file) {
-    toast({
-      title: "Missing details",
-      description: "Please fill all fields and select a file.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  setIsUploading(true);
-  toast({ title: "Uploading...", description: "Please wait." });
-
-  try {
-    // ✅ 1. Ensure patient is registered
-    try {
-      const isRegistered = await storage.isRegistered(account);
-      if (!isRegistered) {
-        const regTx = await storage.registerPatient();
-        await regTx.wait();
-        toast({ title: "Patient registered successfully" });
-      }
-    } catch (regErr) {
-      console.warn("Registration skipped or failed:", regErr.reason);
-    }
-
-    // ✅ 2. Upload file to Lighthouse
-    const cid = await uploadToLighthouse(file);
-    setCid(cid);
-    toast({ title: "File uploaded", description: `CID: ${cid}` });
-
-    // ✅ 3. Send to blockchain
-    const tx = await storage.uploadRecord(title, cid, description, doctor);
-    toast({ title: "Confirming transaction..." });
-    const receipt = await tx.wait();
-
-    const event = receipt.events?.find((e) => e.event === "RecordUploaded");
-    if (event) {
-      const { recordId, ipfsHash } = event.args;
+  const handleUpload = async () => {
+    if (!title || !doctor || !description || !file) {
       toast({
-        title: "Record stored on blockchain",
-        description: `Record ID: ${recordId.toString()}, CID: ${ipfsHash}`,
+        title: "Missing details",
+        description: "Please fill all fields and select a file.",
+        variant: "destructive",
       });
-      setOpen(false);
+      return;
     }
 
-    // ✅ 4. Reset form
-    setTitle("");
-    setDoctor("");
-    setDescription("");
-    setFile(null);
-    setOpen(false);
-    setCid(null);
-  } catch (err) {
-    console.error("Upload failed:", err);
-    toast({
-      title: "Upload failed",
-      description: err.message || "Something went wrong",
-      variant: "destructive",
-    });
-  } finally {
-    setIsUploading(false);
-  }
-};
+    setIsUploading(true);
+    toast({ title: "Uploading...", description: "Please wait." });
 
+    try {
+      // ✅ 1. Ensure patient is registered
+      try {
+        const isRegistered = await storage.isRegistered(account);
+        if (!isRegistered) {
+          const regTx = await storage.registerPatient();
+          await regTx.wait();
+          toast({ title: "Patient registered successfully" });
+        }
+      } catch (regErr) {
+        console.warn("Registration skipped or failed:", regErr.reason);
+      }
+
+      // ✅ 2. Upload file to Lighthouse
+      const cid = await uploadToLighthouse(file);
+      setCid(cid);
+      toast({ title: "File uploaded", description: `CID: ${cid}` });
+
+      // ✅ 3. Send to blockchain
+      const tx = await storage.uploadRecord(title, cid, description, doctor);
+      toast({ title: "Confirming transaction..." });
+      const receipt = await tx.wait();
+
+      const event = receipt.events?.find((e) => e.event === "RecordUploaded");
+      if (event) {
+        const { recordId, ipfsHash } = event.args;
+        toast({
+          title: "Record stored on blockchain",
+          description: `Record ID: ${recordId.toString()}, CID: ${ipfsHash}`,
+        });
+        addRecord(newRecord);   //instant update in Dashboard
+        await fetchRecords();
+        setOpen(false);
+      }
+
+      //  4. Reset form
+      setTitle("");
+      setDoctor("");
+      setDescription("");
+      setFile(null);
+      setCid(null);
+    } catch (err) {
+      console.error("Upload failed:", err);
+      toast({
+        title: "Upload failed",
+        description: err.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -161,15 +164,14 @@ export function UploadRecordDialog() {
             />
             {file && (
               <p className="text-xs text-muted-foreground">
-                Selected: {file.name} (
-                {(file.size / 1024 / 1024).toFixed(2)} MB)
+                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
               </p>
             )}
           </div>
 
           {cid && (
             <p className="text-sm text-green-600 break-all">
-              ✅ Uploaded! CID:{" "}
+              Uploaded! CID:{" "}
               <a
                 href={`https://gateway.lighthouse.storage/ipfs/${cid}`}
                 target="_blank"

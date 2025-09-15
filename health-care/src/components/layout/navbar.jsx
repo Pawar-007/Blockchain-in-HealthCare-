@@ -13,7 +13,7 @@ import {
   Shield,
 } from "lucide-react";
 import {useContracts} from "../../context/ContractContext.jsx";
-
+import { useMedicalRecords } from "../../context/MedicalRecordContext.jsx";
 const navItems = [
   { name: "Browse Requests", href: "/requests", icon: Users },
   { name: "Medical Records", href: "/records", icon: Heart },
@@ -26,7 +26,7 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const {account, connectWallet,disconnectWallet,storage} = useContracts();
-
+  const {setMedicalRecords} = useMedicalRecords();
    const handleConnectWallet = async () => {
     try {
       console.log("Connecting wallet...");
@@ -40,6 +40,7 @@ export default function Navbar() {
   const handleDisconnectWallet =async () => {
     console.log("Disconnecting wallet...");
     await disconnectWallet();
+    setMedicalRecords([]);
   };
 
   return (
