@@ -1,6 +1,6 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
-import image from "/healthcare-removebg-preview.png"; //  direct from public folder
+import image from "/healthcare-removebg-preview.png"; // ✅ direct from public folder
 import { Link } from "react-router-dom";
 const HeroSection = () => {
   return (
@@ -25,14 +25,22 @@ const HeroSection = () => {
               100% Secure • Transparent • Trusted
             </span>
           </p>
-
+<div className="flex gap-x-4 ">
       <Link
-  to="/"
+  to="/Browse Requests"
   className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 
   rounded-full font-semibold text-lg hover:bg-blue-700 transition"
 >
-  Start Donating <ArrowRight size={22} />
+  Start donation <ArrowRight size={22} />
 </Link>
+   <Link
+  to="/create-request"
+  className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 
+  rounded-full font-semibold text-lg hover:bg-blue-700 transition"
+>
+  Create Fund Request <ArrowRight size={22} />
+</Link>
+</div>
         </div>
 
         {/* Right Side - Illustration */}

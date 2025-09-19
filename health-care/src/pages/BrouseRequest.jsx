@@ -1,8 +1,9 @@
-// src/pages/Requests.jsx
 import React, { useState, useEffect } from "react";
 
 export default function Requests() {
   const [requests, setRequests] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+
   useEffect(() => {
     setRequests([
       {
@@ -73,6 +74,12 @@ export default function Requests() {
     ]);
   }, []);
 
+  // Filter logic
+  const filteredRequests =
+    selectedCategory === "All Categories"
+      ? requests
+      : requests.filter((req) => req.category === selectedCategory);
+
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
       {/* Header + Fund to Everyone Button */}
@@ -87,7 +94,6 @@ export default function Requests() {
           </p>
         </div>
 
-        {/* Fund to Everyone Button (Blue Gradient) */}
         <button className="ml-6 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md transition">
           Fund to Everyone
         </button>
@@ -101,7 +107,11 @@ export default function Requests() {
           className="w-full md:w-1/2 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="flex gap-3">
-          <select className="border rounded-lg px-3 py-2">
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
             <option>All Categories</option>
             <option>Emergency</option>
             <option>Cancer</option>
@@ -119,7 +129,7 @@ export default function Requests() {
 
       {/* Requests Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {requests.map((req, i) => (
+        {filteredRequests.map((req, i) => (
           <div
             key={i}
             className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition"
@@ -178,6 +188,17 @@ export default function Requests() {
                 <span className="font-semibold">{req.patientAge}</span>
                 <span>patient</span>
               </div>
+            </div>
+
+            {/* Donate Button */}
+            <div className="mt-5">
+              <button
+                onClick={() => alert(`Donating to: ${req.title}`)}
+                className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white font-semibold py-2 rounded-lg shadow-md transition flex items-center justify-center gap-2"
+              >
+                <span>♡</span>
+                <span>Donate Now</span>
+              </button>
             </div>
           </div>
         ))}

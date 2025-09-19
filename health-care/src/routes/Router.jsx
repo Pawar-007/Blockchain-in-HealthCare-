@@ -6,6 +6,7 @@ import Hospital from "../pages/Hospital.jsx";
 import Index from "../pages/Index.jsx";
 import Requests from "../pages/BrouseRequest.jsx";
 import AdminPage from "../pages/Admin.jsx";
+import CreateRequestPage from "../pages/CreateRequestPage.jsx";
 const Router = () => {
   return (  
     <BrowserRouter>
@@ -15,6 +16,7 @@ const Router = () => {
         <Route path="/hospitals" element={<Hospital />} />
         <Route path="/requests" element={<Requests />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/create-request" element={<CreateRequestPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -110,8 +110,11 @@ const Dashboard = () => {
               <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button variant="outline" className="flex flex-col items-center gap-2 h-20">
+                  <Link to="/create-request" className="flex flex-col items-center gap-2 h-20">
                   <Plus className="h-6 w-6" /> Create New Campaign
+                  </Link>
                 </Button>
+                
 
                 {/*  Upload Record Dialog Trigger */}
                 <UploadRecordDialog onUploadSuccess={handleRecordUpload} />
