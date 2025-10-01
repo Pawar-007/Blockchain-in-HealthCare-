@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { healthCareFundingAbi, storageAbi, hospitalRegistryAbi } from "../contractIntegration/contractAbi.js";
 
+// Contract addresses from .env
 const FUNDING_ADDRESS = import.meta.env.VITE_FUNDING_ADDRESS;
 const STORAGE_ADDRESS = import.meta.env.VITE_STORAGE_ADDRESS;
 const HOSPITAL_ADDRESS = import.meta.env.VITE_HOSPITAL_ADDRESS;
@@ -18,86 +19,119 @@ export const ContractProvider = ({ children }) => {
   // Connect wallet manually
   const connectWallet = async () => {
     if (!window.ethereum) {
-      console.error("MetaMask not found!");
+      console.error("❌ MetaMask not found!");
       return;
     }
     try {
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const signer = await ethProvider.getSigner();
-      initContracts(ethProvider, signer, accounts[0]);
-      console.log({
-        "Connected account": accounts[0],
-        "ethProvider": ethProvider,
-        "signer": signer
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
       });
-      // ✅ Store wallet address in sessionStorage
+      const signer = await ethProvider.getSigner();
+
+      initContracts(ethProvider, signer, accounts[0]);
       sessionStorage.setItem("connectedWallet", accounts[0]);
+
+      console.log("✅ Wallet connected:", accounts[0]);
     } catch (err) {
-      console.error("Wallet connection failed:", err);
+      console.error("❌ Wallet connection failed:", err);
     }
   };
 
-  // On page load, check if wallet address is stored
+  // Auto-connect if wallet was previously connected
   useEffect(() => {
     const savedWallet = sessionStorage.getItem("connectedWallet");
     if (savedWallet && window.ethereum) {
       const autoConnect = async () => {
         const ethProvider = new ethers.BrowserProvider(window.ethereum);
         const signer = await ethProvider.getSigner();
-        console.log("signer", signer);
         initContracts(ethProvider, signer, savedWallet);
       };
       autoConnect();
     }
   }, []);
-  //logout
-   const disconnectWallet = () => {
+
+  // Disconnect wallet
+  const disconnectWallet = () => {
     setProvider(null);
     setSigner(null);
     setContracts({});
     setAccount(null);
+    setHasCheckedRegistration(false);
     sessionStorage.removeItem("connectedWallet");
-    console.log("Wallet disconnected");
+    console.log("🔌 Wallet disconnected");
   };
 
-
+  // Initialize contracts
   const initContracts = (ethProvider, signer, account) => {
-    const funding = new ethers.Contract(FUNDING_ADDRESS, healthCareFundingAbi, signer);
-    const storage = new ethers.Contract(STORAGE_ADDRESS, storageAbi, signer);
-    const hospital = new ethers.Contract(HOSPITAL_ADDRESS, hospitalRegistryAbi, signer);
-    setProvider(ethProvider);
-    setSigner(signer);
-    setContracts({ funding, storage, hospital });
-    setAccount(account);
-    console.log("Contracts initialized", { funding, storage, hospital });
-    
-    
+    try {
+      const funding = new ethers.Contract(
+        FUNDING_ADDRESS,
+        healthCareFundingAbi,
+        signer
+      );
+      const storage = new ethers.Contract(
+        STORAGE_ADDRESS,
+        storageAbi,
+        signer
+      );
+      const hospital = new ethers.Contract(
+        HOSPITAL_ADDRESS,
+        hospitalRegistryAbi,
+        signer
+      );
+
+      setProvider(ethProvider);
+      setSigner(signer);
+      setContracts({ funding, storage, hospital });
+      setAccount(account);
+
+      console.log("✅ Contracts initialized");
+    } catch (err) {
+      console.error("❌ Failed to init contracts:", err);
+    }
   };
-  
-  const registerPatient = async () => {
-  if (!contracts?.storage || !account) return;
 
-  try {
-    console.log("Attempting patient registration...");
-    const tx = await contracts.storage.registerPatient(account);
-    await tx.wait();
-    console.log(" Patient registered successfully");
-  } catch (err) {
-    // Ignore errors like "already registered"
-    console.log("ℹ️ Registration skipped (probably already registered)", err.reason || err.message);
-  }
-};
+  // Auto-register patient if not registered
+  useEffect(() => {
+    if (!contracts?.storage || !account || hasCheckedRegistration) return;
 
-   useEffect(() => {
-  if (contracts?.storage && account) {
-    registerPatient();
-  }
-}, [contracts, account]);
-   
-  
+    const autoRegister = async () => {
+      try {
+        console.log("🔎 Checking registration for:", account);
+
+        // Call read-only function
+        const registered = await contracts.storage.isRegistered(account);
+
+        if (!registered) {
+          console.log("🟡 Not registered. Registering now...");
+          const tx = await contracts.storage.registerPatient(account);
+          await tx.wait();
+          console.log("✅ Patient registered successfully");
+        } else {
+          console.log("✅ Patient already registered");
+        }
+      } catch (err) {
+        console.error("⚠️ Registration check failed:", err);
+      } finally {
+        setHasCheckedRegistration(true);
+      }
+    };
+
+    autoRegister();
+  }, [contracts?.storage, account, hasCheckedRegistration]);
+
   return (
-    <ContractContext.Provider value={{ provider, signer, account, ...contracts, connectWallet,disconnectWallet }}>
+    <ContractContext.Provider
+      value={{
+        provider,
+        signer,
+        account,
+        ...contracts,
+        connectWallet,
+        disconnectWallet,
+      }}
+    >
       {children}
     </ContractContext.Provider>
   );

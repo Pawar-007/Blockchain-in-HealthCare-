@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useContracts } from "../context/ContractContext.jsx";
 import { useToast } from "../components/ui/use-toast.jsx";
-import { uploadToLighthouse } from "../ipfsIntegration/uploadOnIpfs.js";
+import  uploadToLighthouse  from "../ipfsIntegration/uploadOnIpfs.js";
 import { MapPin, Mail, Phone, CheckCircle, Clock, FileText,PlusCircle, Calendar } from "lucide-react";
 
 export default function Hospital() {
@@ -29,6 +29,7 @@ const fetchHospitals = async () => {
   try {
     setLoadingHospitals(true);
     const events = await hospital.queryFilter("HospitalRegistered");
+    console.log("HospitalRegistered events:", events);
     const addresses = [...new Set(events.map((e) => e.args.hospital))];
 
     const fetched = [];

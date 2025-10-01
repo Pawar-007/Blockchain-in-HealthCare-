@@ -13,7 +13,7 @@ import {
 } from "../ui/Dialog.jsx";
 import { useToast } from "../ui/use-toast.jsx";
 import { Upload, FileText, Loader2 } from "lucide-react";
-import { uploadToLighthouse } from "../../ipfsIntegration/uploadOnIpfs.js";
+import  uploadToLighthouse  from "../../ipfsIntegration/uploadOnIpfs.js";
 import { useContracts } from "../../context/ContractContext.jsx";
 import { useMedicalRecords } from "../../context/MedicalRecordContext.jsx"; // ✅ import context
 
@@ -70,7 +70,7 @@ export function UploadRecordDialog() {
       const tx = await storage.uploadRecord(title, cid, description, doctor);
       toast({ title: "Confirming transaction..." });
       const receipt = await tx.wait();
-
+      console.log("Transaction receipt:", tx);
       const event = receipt.events?.find((e) => e.event === "RecordUploaded");
       if (event) {
         const { recordId, ipfsHash } = event.args;

@@ -106,7 +106,7 @@
             string memory _title,
             string memory _ipfsHash,
             string memory _metadata,
-            string memory _doctorName   // ✅ take doctor name as input
+            string memory _doctorName   //  take doctor name as input
         ) external onlyRegisteredPatient {
             Patient storage p = patients[msg.sender];
             uint256 recordId = p.recordCount;
@@ -117,7 +117,7 @@
                 metadata: _metadata,
                 timestamp: block.timestamp,
                 sharedForFunding: false,
-                doctorName: _doctorName   // ✅ save name instead of msg.sender
+                doctorName: _doctorName   //  save name instead of msg.sender
             });
 
             p.recordCount++;
@@ -131,10 +131,15 @@
         }
         
         function isRegistered(address _patient) external view returns (bool) {
-        return patients[_patient].registered;
-        }
+         if (patients[_patient].registered) {
+         return true;
+      }
+       return false;
+     }
+
+
         function getPatientRecords(address _patient) external view returns (HealthRecord[] memory) {
-            if (
+            if (    
                 msg.sender != _patient &&
                 msg.sender != patients[_patient].guardian &&
                 !access[_patient][msg.sender]

@@ -27,8 +27,6 @@ const Dashboard = () => {
     console.log("Connecting wallet...",account);
     await connectWallet();
   }
-  console.log("Records:",medicalRecords);
-  
 
   const myCampaigns = [
     { id: 1, title: "Heart Surgery Recovery Fund", goal: 15000, raised: 12500, donors: 89, status: "Active", daysLeft: 12, verificationStatus: "Verified" },
@@ -36,9 +34,11 @@ const Dashboard = () => {
   ];
 
   // Add record after successful upload
-      const handleRecordUpload = () => {
-      fetchRecords(); // refresh records from blockchain after upload
-    };
+  const handleRecordUpload = async () => {
+    await fetchRecords();
+  toast({ title: "Records updated!" });
+};
+
     
     
 
@@ -142,7 +142,7 @@ const Dashboard = () => {
     </Card>
   ) : (
     <div className="grid gap-4">
-      {medicalRecords.map(record => (
+      {medicalRecords?.map(record => (
         <Card key={record.id}>
           <CardContent className="flex items-center justify-between">
             <div className="flex items-center gap-4">

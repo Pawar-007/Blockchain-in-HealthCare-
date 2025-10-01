@@ -2,10 +2,10 @@
 import lighthouse from "@lighthouse-web3/sdk";
 
 const apiKey = import.meta.env.VITE_LIGHTHOUSE_API_KEY; // from .env
-
-export async function uploadToLighthouse(file) {
+console.log("Using Lighthouse API Key:", apiKey);
+export default async function uploadToLighthouse(file) {
   try {
-    console.log("Uploading file to Lighthouse...");
+    console.log("Uploading file to Lighthouse...",[file]);
 
     const output = await lighthouse.upload([file], apiKey);
 
