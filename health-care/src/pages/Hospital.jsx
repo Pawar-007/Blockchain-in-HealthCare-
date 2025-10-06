@@ -242,6 +242,7 @@ const fetchHospitals = async () => {
       <Phone size={16} className="text-green-500" />
       {h.contact}
     </p>
+    
     {h.registeredAt && (
       <p className="flex items-center gap-2 text-sm text-gray-500">
         <Calendar size={16} className="text-purple-500" />
@@ -250,6 +251,9 @@ const fetchHospitals = async () => {
       </p>
     )}
   </div>
+ <p className="flex items-center gap-2 text-sm text-gray-700 font-mono bg-gray-100 px-3 py-1 rounded-md border border-gray-300">
+  {h.address}
+</p>
 
   {/* Document */}
   {h.cid && (

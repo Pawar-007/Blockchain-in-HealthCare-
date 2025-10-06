@@ -27,7 +27,7 @@ const HeroSection = () => {
           </p>
 <div className="flex gap-x-4 ">
       <Link
-  to="/Browse Requests"
+  to="/requests"
   className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 
   rounded-full font-semibold text-lg hover:bg-blue-700 transition"
 >

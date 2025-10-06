@@ -494,6 +494,106 @@ const healthCareFundingAbi =[
 	},
 	{
 		"inputs": [],
+		"name": "getVerifiedNotFundedRequests",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "patient",
+						"type": "address"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "description",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "createdAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "deadline",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "hospitalWallet",
+						"type": "address"
+					},
+					{
+						"internalType": "string",
+						"name": "diseaseType",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "patientCallVerified",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "hospitalCrosscheckVerified",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "physicalVisitVerified",
+						"type": "bool"
+					},
+					{
+						"internalType": "string",
+						"name": "contactNumber",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "visible",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "active",
+						"type": "bool"
+					},
+					{
+						"internalType": "bool",
+						"name": "isFunded",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalFunded",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "goalAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string[]",
+						"name": "medicalRecords",
+						"type": "string[]"
+					}
+				],
+				"internalType": "struct HealthcareFunding.Request[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "owner",
 		"outputs": [
 			{
