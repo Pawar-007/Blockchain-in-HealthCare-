@@ -16,10 +16,11 @@ import {useContracts} from "../../context/ContractContext.jsx";
 import { useMedicalRecords } from "../../context/MedicalRecordContext.jsx";
 const navItems = [
   { name: "Browse Requests", href: "/requests", icon: Users },
-  { name: "Medical Records", href: "/records", icon: Heart },
+  { name: "Transaction history", href: "/transactions", icon: Heart },
   { name: "For Hospitals", href: "/hospitals", icon: Building2 },
   { name: "Dashboard", href: "/dashboard", icon: Shield },
   { name: "Admin", href: "/admin", icon: Settings },
+  { name: "Funded Requests", href: "/funded-requests", icon: Users }
 ];
 
 export default function Navbar() {

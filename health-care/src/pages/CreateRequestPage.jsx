@@ -35,9 +35,6 @@ const CreateRequestPage = () => {
     if (!formData.diseaseType) newErrors.diseaseType = "Disease Type is required";
     if (!formData.contactNumber) newErrors.contactNumber = "Contact Number is required";
     if (!formData.goalAmount) newErrors.goalAmount = "Goal Amount is required";
-    if (formData.goalAmount && parseInt(formData.goalAmount) < 5000)
-      newErrors.goalAmount = "Goal Amount must be at least 5000";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -190,7 +187,7 @@ const CreateRequestPage = () => {
 
             {/* Goal Amount */}
             <div>
-              <label className="block text-gray-700 font-medium mb-1">Goal Amount (Min 5000 INR)*</label>
+              <label className="block text-gray-700 font-medium mb-1">Goal Amount (ETH)*</label>
               <input
                 type="number"
                 name="goalAmount"

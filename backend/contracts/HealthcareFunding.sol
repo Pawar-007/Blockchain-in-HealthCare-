@@ -25,25 +25,38 @@ contract HealthcareFunding {
         string[] medicalRecords;
     }
 
+    struct TransactionDetail {
+        uint256 txId;
+        address donor;
+        address patient;
+        uint256 amount;
+        uint256 timestamp;
+    }
+
     // -----------------------------
     // STATE
     // -----------------------------
     address public owner;
     mapping(address => bool) public admins;
 
-    // Each patient wallet => their funding request
     mapping(address => Request) public requestsByPatient;
     address[] public patientList;
 
-    // Donor tracking (patient -> donor -> amount)
     mapping(address => mapping(address => uint256)) public donorAmounts;
+
+    // 🆕 NEW TRANSACTION STATE
+    TransactionDetail[] public allTransactions;
+    mapping(address => uint256[]) public transactionsByPatient; // patient → txIds
+    mapping(address => uint256[]) public transactionsByDonor;   // donor → txIds
+
+    uint256 private nextTxId = 1;
 
     // -----------------------------
     // EVENTS
     // -----------------------------
     event RequestCreated(address indexed patient, string name, string diseaseType);
     event RequestVisible(address indexed patient);
-    event Donated(address indexed patient, address indexed donor, uint256 amount);
+    event Donated(address indexed patient, address indexed donor, uint256 amount, uint256 txId);
     event FundsReleased(address indexed patient, uint256 amount, address hospitalWallet);
     event MedicalRecordAdded(address indexed patient, string cid);
 
@@ -65,7 +78,7 @@ contract HealthcareFunding {
     // -----------------------------
     constructor() {
         owner = msg.sender;
-        admins[msg.sender] = true; // main admin
+        admins[msg.sender] = true;
     }
 
     // -----------------------------
@@ -82,13 +95,13 @@ contract HealthcareFunding {
     // -----------------------------
     // REQUEST CREATION
     // -----------------------------
-     function createRequest(
+    function createRequest(
         string memory name,
         string memory description,
         uint256 deadline,
         address hospitalWallet,
         string memory diseaseType,
-        string memory contactNumber,   // ✅ take phone number as input
+        string memory contactNumber,
         uint256 goalAmount
     ) external {
         Request storage r = requestsByPatient[msg.sender];
@@ -102,7 +115,7 @@ contract HealthcareFunding {
             deadline: deadline,
             hospitalWallet: hospitalWallet,
             diseaseType: diseaseType,
-            contactNumber: contactNumber,   // ✅ store it
+            contactNumber: contactNumber,
             patientCallVerified: false,
             hospitalCrosscheckVerified: false,
             physicalVisitVerified: false,
@@ -118,7 +131,9 @@ contract HealthcareFunding {
         emit RequestCreated(msg.sender, name, diseaseType);
     }
 
-
+    // -----------------------------
+    // CROWD DONATION
+    // -----------------------------
     uint256 public totalCrowdFunded;
     mapping(address => uint256) public crowdDonorAmounts;
 
@@ -128,7 +143,21 @@ contract HealthcareFunding {
         crowdDonorAmounts[msg.sender] += msg.value;
         totalCrowdFunded += msg.value;
 
-        emit Donated(address(0), msg.sender, msg.value);
+        // Record transaction (patient = address(0) means crowd pool)
+        allTransactions.push(
+            TransactionDetail({
+                txId: nextTxId,
+                donor: msg.sender,
+                patient: address(0),
+                amount: msg.value,
+                timestamp: block.timestamp
+            })
+        );
+
+        transactionsByDonor[msg.sender].push(nextTxId);
+        nextTxId++;
+
+        emit Donated(address(0), msg.sender, msg.value, nextTxId - 1);
     }
 
     // -----------------------------
@@ -179,14 +208,27 @@ contract HealthcareFunding {
         Request storage r = requestsByPatient[patient];
         require(r.active, "Inactive request");
         require(r.visible, "Not verified yet");
-        require(!r.isFunded, "Funds already released"); // ✅ block if funded
+        require(!r.isFunded, "Funds already released");
         require(block.timestamp <= r.deadline, "Deadline passed");
         require(msg.value > 0, "Must send ETH");
 
         donorAmounts[patient][msg.sender] += msg.value;
         r.totalFunded += msg.value;
 
-        emit Donated(patient, msg.sender, msg.value);
+        // 🆕 Record transaction
+        allTransactions.push(
+            TransactionDetail({
+                txId: nextTxId,
+                donor: msg.sender,
+                patient: patient,
+                amount: msg.value,
+                timestamp: block.timestamp
+            })
+        );
+        transactionsByDonor[msg.sender].push(nextTxId);
+        transactionsByPatient[patient].push(nextTxId);
+        emit Donated(patient, msg.sender, msg.value, nextTxId);
+        nextTxId++;
     }
 
     // -----------------------------
@@ -196,13 +238,13 @@ contract HealthcareFunding {
         Request storage r = requestsByPatient[patient];
         require(r.active, "Inactive request");
         require(r.visible, "Not verified");
-        require(!r.isFunded, "Already funded"); // ✅ cannot fund twice
+        require(!r.isFunded, "Already funded");
         require(r.totalFunded > 0, "No funds");
 
         uint256 amount = r.totalFunded;
         r.totalFunded = 0;
         r.active = false;
-        r.isFunded = true; // ✅ mark as funded
+        r.isFunded = true;
 
         (bool success, ) = r.hospitalWallet.call{value: amount}("");
         require(success, "Transfer failed");
@@ -231,4 +273,66 @@ contract HealthcareFunding {
 
         return all;
     }
+
+    function getVerifiedNotFundedRequests() external view returns (Request[] memory) {
+        uint256 total = patientList.length;
+        uint256 count = 0;
+
+        for (uint i = 0; i < total; i++) {
+            Request storage r = requestsByPatient[patientList[i]];
+            if (r.visible && !r.isFunded) {
+                count++;
+            }
+        }
+
+        Request[] memory filtered = new Request[](count);
+        uint256 index = 0;
+        for (uint i = 0; i < total; i++) {
+            Request storage r = requestsByPatient[patientList[i]];
+            if (r.visible && !r.isFunded) {
+                filtered[index] = r;
+                index++;
+            }
+        }
+        return filtered;
+    }
+
+    // -----------------------------
+    // 🆕 NEW VIEW FUNCTIONS
+    // -----------------------------
+    function getAllTransactions() external view returns (TransactionDetail[] memory) {
+        return allTransactions;
+    }
+
+    function getTransactionsByPatient(address patient) external view returns (TransactionDetail[] memory) {
+        uint256[] memory ids = transactionsByPatient[patient];
+        TransactionDetail[] memory result = new TransactionDetail[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            result[i] = allTransactions[ids[i] - 1];
+        }
+        return result;
+    }
+
+    function getTransactionsByDonor(address donor) external view returns (TransactionDetail[] memory) {
+        uint256[] memory ids = transactionsByDonor[donor];
+        TransactionDetail[] memory result = new TransactionDetail[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            result[i] = allTransactions[ids[i] - 1];
+        }
+        return result;
+    }
+
+    // -----------------------------
+// HELPER FUNCTIONS
+// -----------------------------
+function getPatientsDonatedBy(address donor) external view returns (address[] memory) {
+    uint256[] memory ids = transactionsByDonor[donor];
+    address[] memory patients = new address[](ids.length);
+
+    for (uint i = 0; i < ids.length; i++) {
+        patients[i] = allTransactions[ids[i] - 1].patient;
+    }
+    return patients;
+}
+
 }

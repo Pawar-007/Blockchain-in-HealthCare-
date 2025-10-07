@@ -24,6 +24,9 @@ const Dashboard = () => {
   const [myCampaigns, setMyCampaigns] = useState([]);
   const { toast } = useToast();
   const [fundingRecords, setFundingRecords] = useState([]);
+  const [donationsMades, setDonationsMade] = useState([]);
+const [donationsReceived, setDonationsReceived] = useState([]);
+
   const handleConnectWallet = async () => {
     console.log("Connecting wallet...",account);
     await connectWallet();
@@ -104,43 +107,87 @@ const records = rawRecords.map((r) => {
         console.log("Error granting access:", error);
       }
     }
+
+    const loadMyDonations = async () => {
+  if (!funding || !account) return;
+
+  try {
+    const txs = await funding.getTransactionsByDonor(account);
+
+    const formatted = txs.map(tx => ({
+      id: tx[0].toString(),           // Transaction ID
+      donor: tx[1],                   // Donor address
+      receiver: tx[2],                // Receiver/patient address
+      amount: Number(tx[3]),          // Amount donated
+      date: new Date(Number(tx[4]) * 1000).toLocaleDateString() // Convert timestamp
+    }));
+
+    console.log("Loaded my donations:", formatted);
+    setDonationsMade(formatted);
+  } catch (err) {
+    console.error("Error fetching donations made:", err);
+  }
+};
+
+   const loadDonationsReceived = async () => {
+  if (!funding || !account) return;
+
+  try {
+    const donations = await funding.getDonation(account); // your contract function
+    const formatted = donations.map(d => ({
+      id: d[0].toString(),
+      donor: d.donor,
+      amount: Number(d[1]),
+      date: new Date().toLocaleDateString(),
+    }));
+    setDonationsReceived(formatted);
+    console.log("Loaded donations received:", formatted);
+  } catch (err) {
+    console.error("Error fetching donations received:", err);
+  }
+};
+
+
     useEffect(()=>{
       loadMyCampaigns();
+      loadMyDonations();
+    loadDonationsReceived();
     },[storage,account]);
 
   // Donations
   const donationsMade = [];
 
   const stats = [
-  { 
-    title: "Total Raised", 
-    value: "$" + myCampaigns.reduce((sum, c) => sum + Number(c.totalFunded), 0), 
-    change: "+$2,500 this month", 
-    icon: DollarSign, 
-    color: "text-green-600" 
+  {
+    title: "Total Raised",
+    value: "$" + myCampaigns?.reduce((sum, c) => sum + Number(c.totalFunded), 0),
+    change: "+$2,500 this month",
+    icon: DollarSign,
+    color: "text-green-600"
   },
-  { 
-    title: "Active Campaigns", 
-    value: myCampaigns.filter(c => c.active).length.toString(), 
-    change: `${myCampaigns.filter(c => c.active).length} pending approval`, 
-    icon: Heart, 
-    color: "text-blue-600" 
+  {
+    title: "Active Campaigns",
+    value: myCampaigns?.filter(c => c.active).length.toString(),
+    change: `${myCampaigns?.filter(c => c.active).length} pending approval`,
+    icon: Heart,
+    color: "text-blue-600"
   },
-  { 
-    title: "Medical Records", 
-    value: medicalRecords?.length.toString(), 
-    change: "2 shared for funding", 
-    icon: FileText, 
-    color: "text-purple-600" 
+  {
+    title: "Medical Records",
+    value: medicalRecords?.length.toString(),
+    change: "2 shared for funding",
+    icon: FileText,
+    color: "text-purple-600"
   },
-  { 
-    title: "Total Donors", 
-    value: "134", 
-    change: "+12 this week", 
-    icon: Users, 
-    color: "text-yellow-600" 
+  {
+    title: "Total Donated",
+    value: donationsMade?.reduce((sum, d) => sum + d.amount, 0), // ✅ total donated
+    change: `${donationsMade.length} donations made`,
+    icon: Users,
+    color: "text-yellow-600"
   }
 ];
+
 
 
   return (
@@ -426,54 +473,57 @@ const records = rawRecords.map((r) => {
 
                     {/* Donations */}
                     <TabsContent value="donations" activeTab={activeTab}>
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2">
-              <h2 className="text-2xl font-bold">My Donations</h2>
-              {(!donationsMade || donationsMade.length === 0) ? (
-                <Link to="/hospitals">
-                <Button className="self-start md:self-auto">Start Donating</Button>
-                </Link>
-               
-              ) : (
-                <div className="flex items-center justify-between w-full md:w-auto">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <DollarSign className="h-4 w-4" /> Total donated: $
-                    {donationsMade.reduce((sum, d) => sum + d.amount, 0)}
-                  </div>
-                  <Button className="ml-auto md:ml-4">Donate More</Button> {/* ⬅️ shifted to right */}
-                </div>
-              )}
-            </div>
+  <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2">
+    <h2 className="text-2xl font-bold">My Donations</h2>
+    {donationsMades.length === 0 ? (
+      <Link to="/hospitals">
+        <Button className="self-start md:self-auto">Start Donating</Button>
+      </Link>
+    ) : (
+      <div className="flex items-center justify-between w-full md:w-auto">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <DollarSign className="h-4 w-4" /> Total donated: $
+          {donationsMades.reduce((sum, d) => sum + d.amount, 0)}
+        </div>
+        <Button className="ml-auto md:ml-4">Donate More</Button>
+      </div>
+    )}
+  </div>
 
-            {(!donationsMade || donationsMade.length === 0) ? (
-              <Card className="p-6 text-center">
-                <Heart className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                <h3 className="text-lg font-semibold">No donations yet</h3>
-                <p className="text-sm text-gray-500">Start donating to make an impact in someone’s life.</p>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {donationsMade?.map(donation => (
-                  <Card key={donation.id}>
-                    <CardContent className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-lg bg-green-100"><Heart className="h-6 w-6 text-green-600" /></div>
-                        <div>
-                          <h3 className="font-semibold">{donation.campaignTitle}</h3>
-                          <p className="text-sm text-gray-500">Donated ${donation.amount} on {donation.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="success" className="flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" /> {donation.status}
-                        </Badge>
-                        <Button variant="outline" size="sm">View Campaign</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+  {donationsMades.length === 0 ? (
+    <Card className="p-6 text-center">
+      <Heart className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+      <h3 className="text-lg font-semibold">No donations yet</h3>
+      <p className="text-sm text-gray-500">Start donating to make an impact in someone’s life.</p>
+    </Card>
+  ) : (
+    <div className="grid gap-4">
+      {donationsMades.map(donation => (
+        <Card key={donation.id}>
+          <CardContent className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-green-100">
+                <Heart className="h-6 w-6 text-green-600" />
               </div>
-            )}
-          </TabsContent>
+              <div>
+                <h3 className="font-semibold">To: {donation.receiver}</h3>
+                <p className="text-sm text-gray-500">Donor: {donation.donor}</p>
+                <p className="text-sm text-gray-500">Amount: ${donation.amount}</p>
+                <p className="text-sm text-gray-500">Date: {donation.date}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="success" className="flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" /> Donated
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )}
+</TabsContent>
+
         </Tabs>
       </div>
     </div>):(

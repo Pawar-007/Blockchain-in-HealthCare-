@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useContracts } from "../context/ContractContext.jsx";
 import { Input } from "../components/ui/Input.jsx";
+import { ethers } from "ethers";
 export default function Requests() {
   const [requests, setRequests] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
+    const [donationAmounts, setDonationAmounts] = useState({});
+
   const {funding} = useContracts();
   const decodeRequests = (proxyArray) => {
   return proxyArray.map((r) => {
@@ -37,82 +40,69 @@ export default function Requests() {
     try {
     const raw = await funding.getVerifiedNotFundedRequests();
     const decoded = decodeRequests(raw.toArray()); // convert top-level Proxy to array
+    console.log("Fetched requestsdwdw:", decoded);
     setRequests(decoded);
   } catch (err) {
     console.error("Error fetching verified requests:", err);
   }
 };
 
+const fundToEveryone = async (amount) => {
+  if (!funding) {
+    alert("Contract not loaded");
+    return;
+  }
+
+  if (!amount || Number(amount) <= 0) {
+    alert("Enter a valid amount");
+    return;
+  }
+
+  try {
+    // Convert ETH string to wei
+    
+
+    // Call donateToCrowd
+    const tx = await funding.donateToCrowd({ value: amount });
+    await tx.wait();
+
+    alert(`Successfully donated ${amount} ETH to the crowd fund!`);
+    console.log("Crowd donation transaction:", tx);
+
+  } catch (err) {
+    console.error("Crowd donation failed:", err);
+    alert("Donation failed. Check console for details.");
+  }
+};
+
+
+const donateToPatient = async (patientAddress, amount) => {
+  try {
+    // Validate input
+    if (!amount || Number(amount) <= 0) {
+      alert("Enter a valid amount");
+      return;
+    }
+    
+
+    // Convert ETH amount (string) to wei
+  
+
+    // Call the donate function on the funding contract
+    const tx = await funding.donate(patientAddress, { value: amount });
+    await tx.wait(); // wait for transaction to be mined
+
+    alert(`Donation of ${amount} ETH to ${patientAddress} successful!`);
+    console.log("Donation transaction:", tx);
+  } catch (err) {
+    console.error("Donation failed:", err);
+    alert("Donation failed. Check console for details.");
+  }
+};
+
 
 
   useEffect(() => {
-    // setRequests([
-    //   {
-    //     title: "Kidney Transplant for Rajesh",
-    //     description:
-    //       "Rajesh requires an urgent kidney transplant. Verified by Apollo Hospital with nephrologist’s reports.",
-    //     category: "Transplant",
-    //     verified: true,
-    //     severity: "Critical",
-    //     raised: 12000,
-    //     goal: 25000,
-    //     donors: 210,
-    //     daysLeft: 7,
-    //     patientAge: "46yr",
-    //   },
-    //   {
-    //     title: "Chemotherapy for Ananya",
-    //     description:
-    //       "Ananya, a young mother, is undergoing chemotherapy. Financial aid is needed to continue her treatment.",
-    //     category: "Cancer",
-    //     verified: true,
-    //     severity: "High",
-    //     raised: 15200,
-    //     goal: 30000,
-    //     donors: 134,
-    //     daysLeft: 15,
-    //     patientAge: "29yr",
-    //   },
-    //   {
-    //     title: "Accident Recovery Surgery for Mohan",
-    //     description:
-    //       "Mohan met with a severe road accident and needs multiple orthopedic surgeries to recover.",
-    //     category: "Emergency",
-    //     verified: true,
-    //     severity: "Medium",
-    //     raised: 9400,
-    //     goal: 20000,
-    //     donors: 98,
-    //     daysLeft: 10,
-    //     patientAge: "38yr",
-    //   },
-    //   {
-    //     title: "Neonatal Care for Twins",
-    //     description:
-    //       "Premature twins admitted in NICU require prolonged neonatal care. Family is unable to bear the expenses.",
-    //     category: "Pediatric",
-    //     verified: true,
-    //     severity: "High",
-    //     raised: 17800,
-    //     goal: 40000,
-    //     donors: 256,
-    //     daysLeft: 20,
-    //     patientAge: "2mo",
-    //   },
-    //   {
-    //     title: "Heart Valve Replacement for Sita",
-    //     description:
-    //       "Sita requires urgent heart valve replacement surgery. Verified by Fortis Hospital.",
-    //     category: "Cardiac",
-    //     verified: true,
-    //     severity: "Critical",
-    //     raised: 22000,
-    //     goal: 50000,
-    //     donors: 312,
-    //     daysLeft: 9,
-    //     patientAge: "54yr",
-    //   },
-    // ]);
     fetchVerifiedNotFundedRequests();
   }, [funding]);
 
@@ -135,10 +125,24 @@ export default function Requests() {
             impact on someone's life
           </p>
         </div>
+        <div className="flex items-center gap-2">
+  <input
+    type="text"
+    placeholder="ETH Amount"
+    className="w-24 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    value={donationAmounts["all"] || ""}
+    onChange={(e) =>
+      setDonationAmounts({ ...donationAmounts, all: e.target.value })
+    }
+  />
+  <button
+    onClick={() => fundToEveryone(donationAmounts["all"])}
+    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md transition text-sm"
+  >
+    Fund to Everyone
+  </button>
+</div>
 
-        <button className="ml-6 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md transition">
-          Fund to Everyone
-        </button>
       </div>
 
       {/* Search + Filters */}
@@ -198,9 +202,9 @@ export default function Requests() {
     {/* Progress */}
     <div className="mt-4">
       <p className="font-semibold text-gray-800">
-        ${req.totalFunded.toLocaleString()}{" "}
+        ETH {req.totalFunded.toLocaleString()}{" "}
         <span className="font-normal text-gray-500">
-          raised of ${req.goalAmount.toLocaleString()}
+          raised of ETH {req.goalAmount.toLocaleString()}
         </span>
       </p>
       <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -235,20 +239,23 @@ export default function Requests() {
     </div>
 
     {/* Donate Button */}
-    <div className="mt-5 flex items-center gap-3">
-  <Input
-    placeholder="Enter amount in USD"
-    className="flex-1 p-2 border border-gray-300 rounded-lg"
-  />
-  <button
-    onClick={() => alert(`Donating to: ${req.name}`)}
-    className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center justify-center gap-2"
-  >
-    <span>♡</span>
-    <span>Donate Now</span>
-  </button>
-</div>
-
+      <div className="mt-5 flex items-center gap-3">
+              <Input
+                placeholder="Enter amount in ETH"
+                value={donationAmounts[req.patient] || ""}
+                onChange={(e) =>
+                  setDonationAmounts({ ...donationAmounts, [req.patient]: e.target.value })
+                }
+                className="flex-1 p-2 border border-gray-300 rounded-lg"
+              />
+              <button
+                onClick={() => donateToPatient(req.patient, donationAmounts[req.patient])}
+                className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center justify-center gap-2"
+              >
+                <span>♡</span>
+                <span>Donate Now</span>
+              </button>
+            </div>
   </div>
 ))}
 

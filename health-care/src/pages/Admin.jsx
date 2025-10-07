@@ -216,7 +216,7 @@ const verifyPatientCall = async (patientWallet) => {
     });
     return;
   }
-
+  
   try {
     setLoading(true);
     const tx = await funding.verifyPatientCall(patientWallet);
@@ -275,6 +275,27 @@ const verifyPhysicalVisit = async (patientWallet) => {
     toast({ title: "Error", description: err.reason || err.message, variant: "destructive" });
   } finally {
     setLoading(false);
+  }
+};
+  
+   const releaseFundsToPatient = async (patientAddress) => {
+  if (!funding || !account) {
+    console.error("Wallet not connected or contract not loaded");
+    return;
+  }
+
+  try {
+    console.log(`Releasing funds for patient: ${patientAddress}`);
+
+    // Call the contract function (admin only)
+    const tx = await funding.releaseFunds(patientAddress);
+    await tx.wait();
+
+    alert("Funds released successfully!");
+    console.log("Transaction hash:", tx);
+  } catch (error) {
+    console.error("Error releasing funds:", error);
+    alert("Failed to release funds. Check console for details.");
   }
 };
 
@@ -514,7 +535,9 @@ const verifyPhysicalVisit = async (patientWallet) => {
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1">View Details</Button>
                 {allVerified && (
-                  <Button className="flex-1 bg-success hover:bg-success/90">Release Funds</Button>
+                  <Button className="flex-1 bg-success hover:bg-success/90"
+        
+                  >Release Funds</Button>
                 )}
               </div>
             </CardContent>
@@ -589,8 +612,9 @@ const verifyPhysicalVisit = async (patientWallet) => {
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1">View Details</Button>
               <div className="flex gap-2">
-                <Input placeholder="Amount (ETH)" className="w-32" type="number" step="0.01" />
-                <Button className="bg-primary hover:bg-primary/90">Donate</Button>
+                <Button className="bg-primary hover:bg-primary/90"
+                 onClick={() =>  releaseFundsToPatient(req.patient)}
+                >Donate</Button>
               </div>
             </div>
           </CardContent>
